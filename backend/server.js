@@ -22,8 +22,23 @@ const scheduleRoutes = require('./routes/schedule');
 const ScheduledEmail = require('./models/ScheduledEmail');
 const SmtpService = require('./services/smtpService');
 
-// ... existing code ...
+const app = express();
 
+// Middleware
+app.use(cors({
+  origin: true, // Allow all origins (for dev/docker flexibility)
+  credentials: true
+}));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(cookieParser());
+
+// Register API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/mail', mailRoutes);
+app.use('/api/contacts', contactRoutes);
+app.use('/api/folders', folderRoutes);
+app.use('/api/alias', aliasRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/snooze', snoozeRoutes);
 app.use('/api/schedule', scheduleRoutes);
@@ -100,23 +115,7 @@ const processScheduledEmails = async () => {
 };
 
 
-// Middleware
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
-app.use(cookieParser());
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/mail', mailRoutes);
-app.use('/api/contacts', contactRoutes);
-app.use('/api/folders', folderRoutes);
-app.use('/api/alias', aliasRoutes);
-app.use('/api/templates', templateRoutes);
-app.use('/api/snooze', snoozeRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
