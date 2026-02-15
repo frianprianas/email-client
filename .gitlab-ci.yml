@@ -1,0 +1,30 @@
+stages:
+  - deploy
+
+deploy_production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk update && apk add openssh-client git
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  script:
+    - echo "Deploying to production server..."
+    - ssh $SSH_USER@$SSH_HOST "
+        if [ ! -d '$PROJECT_PATH' ]; then
+          git clone https://gitlab.com/frianprianas-group/mail-baknus.git '$PROJECT_PATH';
+          cd '$PROJECT_PATH';
+          cp .env.docker .env;
+        else
+          cd '$PROJECT_PATH';
+          git pull origin main;
+        fi;
+        docker compose down;
+        docker compose up -d --build;
+        docker system prune -af;
+      "
+  only:
+    - main
