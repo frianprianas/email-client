@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import {
     Dialog, Box, Typography, IconButton, TextField, Autocomplete,
     Button, CircularProgress, Tooltip, Divider, Chip, Slide
@@ -487,7 +488,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
 
     const isDraftMode = initialData?.isDraft || draftUid;
 
-    return (
+    const content = (
         <Box
             sx={{
                 position: 'fixed',
@@ -506,6 +507,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                 animation: 'fadeIn 0.2s ease',
                 userSelect: 'text',
                 WebkitUserSelect: 'text',
+                pointerEvents: 'auto',
             }}
         >
             {/* Header */}
@@ -930,6 +932,8 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
             />
         </Box>
     );
+
+    return ReactDOM.createPortal(content, document.body);
 };
 
 export default ComposeDialog;
