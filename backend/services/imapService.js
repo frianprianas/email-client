@@ -71,7 +71,7 @@ class ImapService {
                 return await this._getVirtualFolderMessages(folder, page, limit);
             }
 
-            const imapFolder = this._mapFolderName(folder);
+            const imapFolder = await this._getImapPath(folder);
             const lock = await this.client.getMailboxLock(imapFolder);
 
             try {
@@ -251,7 +251,7 @@ class ImapService {
     async getMessage(folder, uid) {
         try {
             await this.connect();
-            const imapFolder = this._isVirtualFolder(folder) ? 'INBOX' : this._mapFolderName(folder);
+            const imapFolder = this._isVirtualFolder(folder) ? 'INBOX' : await this._getImapPath(folder);
             const lock = await this.client.getMailboxLock(imapFolder);
 
             try {
@@ -313,7 +313,7 @@ class ImapService {
     async searchMessages(folder, query) {
         try {
             await this.connect();
-            const imapFolder = this._mapFolderName(folder);
+            const imapFolder = await this._getImapPath(folder);
             const lock = await this.client.getMailboxLock(imapFolder);
 
             try {
@@ -378,7 +378,7 @@ class ImapService {
     async toggleFlag(folder, uid, flag, add = true) {
         try {
             await this.connect();
-            const imapFolder = this._mapFolderName(folder);
+            const imapFolder = await this._getImapPath(folder);
             const lock = await this.client.getMailboxLock(imapFolder);
 
             try {
@@ -401,8 +401,8 @@ class ImapService {
     async moveMessage(uid, fromFolder, toFolder) {
         try {
             await this.connect();
-            const imapFrom = this._mapFolderName(fromFolder);
-            const imapTo = this._mapFolderName(toFolder);
+            const imapFrom = await this._getImapPath(fromFolder);
+            const imapTo = await this._getImapPath(toFolder);
             const lock = await this.client.getMailboxLock(imapFrom);
 
             try {
@@ -421,12 +421,17 @@ class ImapService {
     async deleteMessage(folder, uid) {
         try {
             await this.connect();
-            const imapFolder = this._mapFolderName(folder);
+            const imapFolder = await this._getImapPath(folder);
             const lock = await this.client.getMailboxLock(imapFolder);
 
             try {
-                await this.client.messageFlagsAdd(uid, ['\\Deleted'], { uid: true });
-                await this.client.expunge();
+                await this.client.messageFlagsAdd(String(uid), ['\\Deleted'], { uid: true });
+                try {
+                    await this.client.expunge();
+                } catch (expungeError) {
+                    console.warn(`Expunge failed for folder ${imapFolder}:`, expungeError.message);
+                    // Continue even if expunge fails - the message is marked deleted
+                }
                 return true;
             } finally {
                 lock.release();
@@ -521,6 +526,40 @@ class ImapService {
 
         // Fallback
         return 'Sent';
+    }
+
+    async _findTrashFolder() {
+        const mailboxes = await this.client.list();
+        const trashNames = ['Trash', 'Bin', 'Deleted', 'Deleted Items', 'Deleted Messages', 'INBOX.Trash', 'INBOX/Trash', 'INBOX.Bin', 'INBOX/Bin'];
+        for (const box of mailboxes) {
+            if (trashNames.includes(box.path) ||
+                (box.specialUse && box.specialUse === '\\Trash')) {
+                return box.path;
+            }
+        }
+        return 'Trash';
+    }
+
+    async _findJunkFolder() {
+        const mailboxes = await this.client.list();
+        const junkNames = ['Junk', 'Spam', 'Junk Email', 'INBOX.Junk', 'INBOX/Junk', 'INBOX.Spam', 'INBOX/Spam'];
+        for (const box of mailboxes) {
+            if (junkNames.includes(box.path) ||
+                (box.specialUse && box.specialUse === '\\Junk')) {
+                return box.path;
+            }
+        }
+        return 'Junk';
+    }
+
+    async _getImapPath(folder) {
+        if (folder === 'INBOX') return 'INBOX';
+        if (folder === 'Sent') return this._findSentFolder();
+        if (folder === 'Drafts') return this._findDraftsFolder();
+        if (folder === 'Trash') return this._findTrashFolder();
+        if (folder === 'Spam') return this._findJunkFolder();
+        // Fallback to simple mapping or proper name
+        return this._mapFolderName(folder);
     }
 
     _hasAttachments(bodyStructure) {

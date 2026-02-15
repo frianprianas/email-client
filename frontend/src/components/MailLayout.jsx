@@ -140,8 +140,9 @@ const MailLayout = () => {
                 const res = await mailAPI.getMessage('Drafts', message.uid);
                 const draft = res.data;
                 handleCompose({
-                    to: (draft.to || []).map(t => t.address),
-                    cc: (draft.cc || []).map(c => c.address),
+                    to: draft.to || [],
+                    cc: draft.cc || [],
+                    bcc: draft.bcc || [],
                     subject: draft.subject || '',
                     quotedHtml: draft.html || draft.text || '',
                     isDraft: true,

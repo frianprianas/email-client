@@ -384,7 +384,7 @@ router.delete('/message/:folder/:uid', authMiddleware, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Delete message error:', error);
-        res.status(500).json({ error: 'Failed to delete message' });
+        res.status(500).json({ error: error.message || 'Failed to delete message' });
     }
 });
 

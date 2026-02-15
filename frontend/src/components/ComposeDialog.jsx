@@ -28,8 +28,11 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
     const theme = useTheme();
     const c = theme.palette.custom;
     const [to, setTo] = useState([]);
+    const [toInputValue, setToInputValue] = useState('');
     const [cc, setCc] = useState([]);
+    const [ccInputValue, setCcInputValue] = useState('');
     const [bcc, setBcc] = useState([]);
+    const [bccInputValue, setBccInputValue] = useState('');
     const [allContacts, setAllContacts] = useState([]);
     const [subject, setSubject] = useState('');
     const [showCc, setShowCc] = useState(false);
@@ -51,21 +54,33 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
             }).catch(err => console.error('Failed to load contacts', err));
         }
 
+        const formatRecipient = (r) => {
+            if (!r) return '';
+            if (typeof r === 'string') return r;
+            // Handle {name, address} object from backend/MailLayout
+            return r.name ? `${r.name} <${r.address}>` : r.address;
+        };
+
         if (initialData) {
-            setTo(initialData.to || []);
+            // Map initial data to strings for the Autocomplete component
+            setTo(initialData.to ? initialData.to.map(formatRecipient) : []);
             setSubject(initialData.subject || '');
             setDraftUid(initialData.draftUid || null);
 
             if (initialData.isDraft) {
-                // For drafts, the body IS the content (not quoted)
                 bodyContentRef.current = initialData.quotedHtml || '';
             } else {
                 bodyContentRef.current = initialData.quotedHtml || '';
             }
 
             if (initialData.cc && initialData.cc.length > 0) {
-                setCc(initialData.cc);
+                setCc(initialData.cc.map(formatRecipient));
                 setShowCc(true);
+            }
+
+            if (initialData.bcc && initialData.bcc.length > 0) {
+                setBcc(initialData.bcc.map(formatRecipient));
+                setShowBcc(true);
             }
         } else {
             setTo([]);
@@ -85,41 +100,54 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
             setAttachments([]);
             setDraftUid(null);
         }
-        // Set innerHTML directly on the DOM element (no re-render)
+        // Set innerHTML directly on the DOM element
         if (bodyRef.current) {
             bodyRef.current.innerHTML = bodyContentRef.current;
         }
     }, [initialData, open]);
 
-    // Also set innerHTML after first render when bodyRef becomes available
-    useEffect(() => {
-        if (open && bodyRef.current && bodyContentRef.current) {
-            bodyRef.current.innerHTML = bodyContentRef.current;
-        }
-    }, [open]);
+    // ... (rest of code)
 
     const getBodyContent = () => {
-        // Always read directly from the DOM element
         return bodyRef.current ? bodyRef.current.innerHTML : bodyContentRef.current;
+    };
+
+    // Helper to get all recipients (chips + currently typed input)
+    const getRecipients = (list, inputValue) => {
+        const recipients = [...list.map(extractEmail)];
+        if (inputValue && inputValue.trim()) {
+            recipients.push(inputValue.trim());
+        }
+        return [...new Set(recipients)]; // Remove duplicates
     };
 
     const hasContent = () => {
         const body = getBodyContent();
         const plainBody = body.replace(/<[^>]*>/g, '').trim();
-        return to.length > 0 || subject.trim() || plainBody;
+        const allTo = getRecipients(to, toInputValue);
+        return allTo.length > 0 || subject.trim() || plainBody;
+    };
+
+    // Helper to extract valid email string from Autocomplete value
+    // Value can be "Name <email>" string OR just "email" string
+    const extractEmail = (val) => {
+        if (typeof val === 'string') return val;
+        if (val && val.address) return val.name ? `${val.name} <${val.address}>` : val.address;
+        return '';
     };
 
     const handleSend = async () => {
-        if (to.length === 0) {
+        const toList = getRecipients(to, toInputValue);
+
+        if (toList.length === 0) {
             showSnackbar('Please add at least one recipient', 'warning');
             return;
         }
 
         setSending(true);
         try {
-            const toList = to;
-            const ccList = cc;
-            const bccList = bcc;
+            const ccList = getRecipients(cc, ccInputValue);
+            const bccList = getRecipients(bcc, bccInputValue);
 
             const htmlContent = getBodyContent();
 
@@ -155,9 +183,9 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
     const handleSaveDraft = async () => {
         setSavingDraft(true);
         try {
-            const toList = to;
-            const ccList = cc;
-            const bccList = bcc;
+            const toList = getRecipients(to, toInputValue);
+            const ccList = getRecipients(cc, ccInputValue);
+            const bccList = getRecipients(bcc, bccInputValue);
 
             const htmlContent = getBodyContent();
 
@@ -294,6 +322,8 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                         options={allContacts.map((c) => c.name ? `${c.name} <${c.email}>` : c.email)}
                         value={to}
                         onChange={(event, newValue) => setTo(newValue)}
+                        inputValue={toInputValue}
+                        onInputChange={(event, newInputValue) => setToInputValue(newInputValue)}
                         renderTags={(value, getTagProps) =>
                             value.map((option, index) => {
                                 const { key, ...tagProps } = getTagProps({ index });
@@ -357,6 +387,8 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                             options={allContacts.map((c) => c.name ? `${c.name} <${c.email}>` : c.email)}
                             value={cc}
                             onChange={(event, newValue) => setCc(newValue)}
+                            inputValue={ccInputValue}
+                            onInputChange={(event, newInputValue) => setCcInputValue(newInputValue)}
                             renderTags={(value, getTagProps) =>
                                 value.map((option, index) => {
                                     const { key, ...tagProps } = getTagProps({ index });
@@ -394,6 +426,8 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                             options={allContacts.map((c) => c.name ? `${c.name} <${c.email}>` : c.email)}
                             value={bcc}
                             onChange={(event, newValue) => setBcc(newValue)}
+                            inputValue={bccInputValue}
+                            onInputChange={(event, newInputValue) => setBccInputValue(newInputValue)}
                             renderTags={(value, getTagProps) =>
                                 value.map((option, index) => {
                                     const { key, ...tagProps } = getTagProps({ index });
