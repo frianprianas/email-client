@@ -102,6 +102,14 @@ router.post('/send', authMiddleware, async (req, res) => {
     try {
         const { to, cc, bcc, subject, text, html, attachments, inReplyTo, references } = req.body;
 
+        console.log('--- SEND EMAIL DEBUG ---');
+        console.log('Subject:', subject);
+        console.log('Text length:', text ? text.length : 0);
+        console.log('HTML length:', html ? html.length : 0);
+        console.log('Recipients:', to);
+        console.log('Full Body Keys:', Object.keys(req.body));
+        console.log('------------------------');
+
         if (!to || to.length === 0) {
             return res.status(400).json({ error: 'At least one recipient is required' });
         }
@@ -111,6 +119,8 @@ router.post('/send', authMiddleware, async (req, res) => {
         const info = await smtpService.sendMail({
             to, cc, bcc, subject, text, html, attachments, inReplyTo, references
         });
+
+        console.log('SMTP Response:', info);
 
         // Build raw message and save to Sent folder via IMAP
         try {
