@@ -11,8 +11,8 @@ class ImapService {
     async connect() {
         this.client = new ImapFlow({
             host: process.env.MAIL_HOST,
-            port: parseInt(process.env.IMAP_PORT),
-            secure: process.env.MAIL_SECURE === 'true',
+            port: process.env.IMAP_PORT ? parseInt(process.env.IMAP_PORT) : 993,
+            secure: process.env.MAIL_SECURE !== 'false',
             auth: {
                 user: this.email,
                 pass: this.password
