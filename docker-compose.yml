@@ -30,6 +30,9 @@ services:
       - SMTP_PORT=${SMTP_PORT:-587}
       - MAIL_SECURE=${MAIL_SECURE:-false}
       - IMAP_PORT=${IMAP_PORT:-143}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - MAILCOW_API_URL=${MAILCOW_API_URL}
+      - MAILCOW_API_KEY=${MAILCOW_API_KEY}
     depends_on:
       - db
     ports:
