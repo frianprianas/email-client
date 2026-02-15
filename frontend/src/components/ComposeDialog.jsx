@@ -496,7 +496,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                 right: maximized ? 0 : { xs: 0, sm: 80 },
                 width: maximized ? '100%' : { xs: '100%', sm: 560 },
                 height: maximized ? '100%' : { xs: '100%', sm: 520 },
-                zIndex: 1500,
+                zIndex: 99999,
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: maximized ? 0 : { xs: 0, sm: '12px 12px 0 0' },
@@ -508,6 +508,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                 userSelect: 'text',
                 WebkitUserSelect: 'text',
                 pointerEvents: 'auto',
+                isolation: 'isolate',
             }}
         >
             {/* Header */}
