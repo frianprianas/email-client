@@ -1,5 +1,8 @@
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const User = require('../models/User');
+const SnoozedEmail = require('../models/SnoozedEmail');
+const ScheduledEmail = require('../models/ScheduledEmail');
 
 class ImapService {
     constructor(email, password) {
@@ -60,7 +63,7 @@ class ImapService {
 
     // Check if it's a virtual folder (not a real IMAP mailbox)
     _isVirtualFolder(folder) {
-        return ['Starred', 'All Mail', 'Important'].includes(folder);
+        return ['Starred', 'All Mail', 'Important', 'Snoozed', 'Scheduled'].includes(folder);
     }
 
     async getMessages(folder = 'INBOX', page = 1, limit = 50) {
@@ -228,7 +231,37 @@ class ImapService {
             // Search for flagged messages in INBOX
             const msgs = await fetchFromFolder('INBOX', { flagged: true });
             allMessages.push(...msgs);
-        } else if (folder === 'Important' || folder === 'Snoozed') {
+        } else if (folder === 'Snoozed') {
+            try {
+                const user = await User.findOne({ where: { email: this.email } });
+                if (user) {
+                    const snoozed = await SnoozedEmail.findAll({ where: { userId: user.id } });
+                    const uids = snoozed.map(s => s.messageUid).filter(uid => uid);
+                    if (uids.length > 0) {
+                        // Join UIDs string properly
+                        const msgs = await fetchFromFolder('INBOX', { uid: uids.join(',') });
+                        allMessages.push(...msgs);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching snoozed emails:', err);
+            }
+        } else if (folder === 'Scheduled') {
+            try {
+                const user = await User.findOne({ where: { email: this.email } });
+                if (user) {
+                    const scheduled = await ScheduledEmail.findAll({ where: { userId: user.id } });
+                    // Assuming scheduled emails are stored as drafts
+                    const uids = scheduled.map(s => s.draftUid).filter(uid => uid);
+                    if (uids.length > 0) {
+                        const msgs = await fetchFromFolder('Drafts', { uid: uids.join(',') });
+                        allMessages.push(...msgs);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching scheduled emails:', err);
+            }
+        } else if (folder === 'Important') {
             // Fallback to INBOX for unsupported virtual folders
             const msgs = await fetchFromFolder('INBOX');
             allMessages.push(...msgs);
