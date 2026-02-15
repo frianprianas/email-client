@@ -31,7 +31,7 @@ const LoginPage = () => {
         setLoading(true);
 
         try {
-            const fullEmail = `${username}@${MAIL_DOMAIN}`;
+            const fullEmail = username.includes('@') ? username : `${username}@${MAIL_DOMAIN}`;
             await login(fullEmail, password);
         } catch (err) {
             setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
@@ -52,7 +52,7 @@ const LoginPage = () => {
                 overflow: 'hidden',
             }}
         >
-            {/* Animated background elements */}
+            {/* ... background elements ... */}
             <Box sx={{
                 position: 'absolute',
                 top: '-20%',
@@ -92,7 +92,7 @@ const LoginPage = () => {
                         zIndex: 1,
                     }}
                 >
-                    {/* Logo */}
+                    {/* ... Logo Section ... */}
                     <Box sx={{ textAlign: 'center', mb: 4 }}>
                         <Box
                             component="img"
@@ -140,10 +140,10 @@ const LoginPage = () => {
                     <form onSubmit={handleSubmit}>
                         <TextField
                             fullWidth
-                            label="Username"
+                            label="Username or Email"
                             type="text"
                             value={username}
-                            onChange={(e) => setUsername(e.target.value.replace(/[@\s]/g, ''))}
+                            onChange={(e) => setUsername(e.target.value)}
                             required
                             sx={{ mb: 2.5 }}
                             InputProps={{
@@ -152,7 +152,7 @@ const LoginPage = () => {
                                         <EmailIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
                                     </InputAdornment>
                                 ),
-                                endAdornment: (
+                                endAdornment: !username.includes('@') ? (
                                     <InputAdornment position="end">
                                         <Typography
                                             variant="body2"
@@ -166,7 +166,7 @@ const LoginPage = () => {
                                             @{MAIL_DOMAIN}
                                         </Typography>
                                     </InputAdornment>
-                                ),
+                                ) : null,
                             }}
                             placeholder="username"
                         />
