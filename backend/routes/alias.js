@@ -5,12 +5,15 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-const MAILCOW_API_URL = process.env.MAILCOW_API_URL;
-const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY;
+const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'http://mail.example.com';
+const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY || '';
+
+// Clean up URL: remove trailing slash
+const baseUrl = MAILCOW_API_URL.endsWith('/') ? MAILCOW_API_URL.slice(0, -1) : MAILCOW_API_URL;
 
 // Axios instance for Mailcow API (skip SSL verification for self-signed certs)
 const mailcowClient = axios.create({
-    baseURL: `${MAILCOW_API_URL}/api/v1`,
+    baseURL: `${baseUrl}/api/v1`,
     headers: {
         'Content-Type': 'application/json',
         'X-API-Key': MAILCOW_API_KEY,
