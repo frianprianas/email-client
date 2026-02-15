@@ -232,7 +232,8 @@ const MailLayout = () => {
     const handleToggleStar = async (msg) => {
         try {
             const newStarred = !msg.isStarred;
-            await mailAPI.toggleStar(currentFolder, msg.uid, newStarred);
+            const targetFolder = msg.folder || currentFolder;
+            await mailAPI.toggleStar(targetFolder, msg.uid, newStarred);
             setMessages(prev => prev.map(m =>
                 m.uid === msg.uid ? { ...m, isStarred: newStarred } : m
             ));
@@ -244,7 +245,8 @@ const MailLayout = () => {
     const handleToggleRead = async (msg) => {
         try {
             const newRead = !msg.isRead;
-            await mailAPI.toggleRead(currentFolder, msg.uid, newRead);
+            const targetFolder = msg.folder || currentFolder;
+            await mailAPI.toggleRead(targetFolder, msg.uid, newRead);
             setMessages(prev => prev.map(m =>
                 m.uid === msg.uid ? { ...m, isRead: newRead } : m
             ));
@@ -255,7 +257,8 @@ const MailLayout = () => {
 
     const handleDeleteMessage = async (msg) => {
         try {
-            await mailAPI.deleteMessage(currentFolder, msg.uid);
+            const targetFolder = msg.folder || currentFolder;
+            await mailAPI.deleteMessage(targetFolder, msg.uid);
             setMessages(prev => prev.filter(m => m.uid !== msg.uid));
             if (selectedMessage?.uid === msg.uid) {
                 setSelectedMessage(null);
