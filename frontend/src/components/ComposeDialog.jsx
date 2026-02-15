@@ -726,6 +726,9 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                         ref={bodyRef}
                         contentEditable
                         suppressContentEditableWarning
+                        onInput={(e) => {
+                            bodyContentRef.current = e.currentTarget.innerHTML;
+                        }}
                         sx={{
                             flex: 1,
                             px: 2,
