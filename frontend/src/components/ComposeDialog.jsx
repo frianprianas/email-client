@@ -65,6 +65,9 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
     // Set initial content only when dialog opens or initialData changes
     useEffect(() => {
         if (open) {
+            setSending(false);
+            setSavingDraft(false);
+            setShowUndoUI(false);
             contactsAPI.getAll().then(res => {
                 setAllContacts(res.data);
             }).catch(err => console.error('Failed to load contacts', err));
