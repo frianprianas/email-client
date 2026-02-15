@@ -12,6 +12,8 @@ services:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - app_network
 
   backend:
     build: ./backend
@@ -27,10 +29,13 @@ services:
       - MAIL_HOST=${MAIL_HOST}
       - SMTP_PORT=${SMTP_PORT:-587}
       - MAIL_SECURE=${MAIL_SECURE:-false}
+      - IMAP_PORT=${IMAP_PORT:-143}
     depends_on:
       - db
     ports:
       - "5000:5000"
+    networks:
+      - app_network
 
   frontend:
     build: ./frontend
@@ -39,6 +44,14 @@ services:
       - "80:80"
     depends_on:
       - backend
+    networks:
+      - app_network
 
 volumes:
   db_data:
+
+networks:
+  app_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1400"
