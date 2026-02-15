@@ -209,6 +209,9 @@ const MailLayout = () => {
     const handleCompose = (data = null) => {
         setComposeData(data);
         setComposeOpen(true);
+        if (isMobile) {
+            setDrawerOpen(false);
+        }
     };
 
     const handleSendComplete = () => {

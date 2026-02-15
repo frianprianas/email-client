@@ -529,7 +529,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                     'New Message'
                         ) : 'New Message'}
                 </Typography>
-                <IconButton size="small" onClick={() => setMaximized(!maximized)} sx={{ color: 'text.secondary' }}>
+                <IconButton size="small" onClick={() => setMaximized(!maximized)} sx={{ color: 'text.secondary', display: { xs: 'none', sm: 'inline-flex' } }}>
                     {maximized ? <RestoreIcon sx={{ fontSize: 16 }} /> : <MaximizeIcon sx={{ fontSize: 16 }} />}
                 </IconButton>
                 <IconButton size="small" onClick={handleCloseWithSave} sx={{ color: 'text.secondary' }}>
