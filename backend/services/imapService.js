@@ -167,7 +167,7 @@ class ImapService {
                 try {
                     let uids;
                     if (searchQuery) {
-                        uids = await this.client.search(searchQuery);
+                        uids = await this.client.search(searchQuery, { uid: true });
                     } else {
                         const status = await this.client.status(folderName, { messages: true });
                         if (status.messages === 0) return [];
