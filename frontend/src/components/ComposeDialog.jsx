@@ -192,6 +192,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                 draftUid: draftUid || undefined,
             });
 
+            setSending(false);
             onSend();
         } catch (error) {
             console.error('Send failed:', error);
