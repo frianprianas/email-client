@@ -3,7 +3,7 @@ const { sequelize } = require('../config/database');
 
 const Template = sequelize.define('Template', {
     userId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false
     },
     name: {

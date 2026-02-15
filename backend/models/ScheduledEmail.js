@@ -3,7 +3,7 @@ const { sequelize } = require('../config/database');
 
 const ScheduledEmail = sequelize.define('ScheduledEmail', {
     userId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false
     },
     to: {

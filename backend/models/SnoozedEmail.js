@@ -3,7 +3,7 @@ const { sequelize } = require('../config/database');
 
 const SnoozedEmail = sequelize.define('SnoozedEmail', {
     userId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false
     },
     messageUid: {
