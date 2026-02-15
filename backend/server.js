@@ -22,6 +22,13 @@ const scheduleRoutes = require('./routes/schedule');
 const ScheduledEmail = require('./models/ScheduledEmail');
 const SmtpService = require('./services/smtpService');
 
+// Define Model Associations
+User.hasMany(SnoozedEmail, { foreignKey: 'userId' });
+SnoozedEmail.belongsTo(User, { foreignKey: 'userId' });
+
+User.hasMany(ScheduledEmail, { foreignKey: 'userId' });
+ScheduledEmail.belongsTo(User, { foreignKey: 'userId' });
+
 const app = express();
 
 // Middleware
