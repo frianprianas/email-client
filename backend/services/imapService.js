@@ -53,13 +53,14 @@ class ImapService {
             'Sent': 'Sent',
             'Drafts': 'Drafts',
             'INBOX': 'INBOX',
+            'Snoozed': 'Snoozed',
         };
         return map[folder] || folder;
     }
 
     // Check if it's a virtual folder (not a real IMAP mailbox)
     _isVirtualFolder(folder) {
-        return ['Starred', 'All Mail', 'Snoozed', 'Important'].includes(folder);
+        return ['Starred', 'All Mail', 'Important'].includes(folder);
     }
 
     async getMessages(folder = 'INBOX', page = 1, limit = 50) {
@@ -96,6 +97,10 @@ class ImapService {
                     size: true
                 })) {
                     const envelope = msg.envelope;
+
+                    if (msg.flags.has('\\Deleted')) {
+                        continue;
+                    }
 
                     // Safe address parser - handles undefined mailbox/host
                     const parseAddr = (a) => {
@@ -182,6 +187,7 @@ class ImapService {
                     const isUid = Array.isArray(uids);
 
                     for await (const msg of this.client.fetch(range, fetchOpts, { uid: isUid })) {
+                        if (msg.flags.has('\\Deleted')) continue;
                         const envelope = msg.envelope;
                         messages.push({
                             uid: msg.uid,
@@ -216,10 +222,8 @@ class ImapService {
         if (folder === 'All Mail') {
             // Aggregate from all main folders
             const folders = ['INBOX', 'Sent', 'Drafts', 'Junk', 'Trash'];
-            for (const f of folders) {
-                const msgs = await fetchFromFolder(f);
-                allMessages.push(...msgs);
-            }
+            const results = await Promise.all(folders.map(f => fetchFromFolder(f)));
+            allMessages = results.flat();
         } else if (folder === 'Starred') {
             // Search for flagged messages in INBOX
             const msgs = await fetchFromFolder('INBOX', { flagged: true });
@@ -338,6 +342,9 @@ class ImapService {
                     bodyStructure: true,
                     size: true
                 })) {
+                    // Filter out messages marked for deletion
+                    if (msg.flags.has('\\Deleted')) continue;
+
                     const envelope = msg.envelope;
 
                     // Safe address parser
@@ -406,8 +413,12 @@ class ImapService {
             const lock = await this.client.getMailboxLock(imapFrom);
 
             try {
-                await this.client.messageMove(uid, imapTo, { uid: true });
-                return true;
+                const result = await this.client.messageMove(uid, imapTo, { uid: true });
+                // result.uidMap is a Map where key is old UID, value is new UID
+                if (result && result.uidMap && result.uidMap.size > 0) {
+                    return result.uidMap.get(parseInt(uid));
+                }
+                return null;
             } finally {
                 lock.release();
             }
@@ -552,12 +563,25 @@ class ImapService {
         return 'Junk';
     }
 
+    async _findSnoozedFolder() {
+        const mailboxes = await this.client.list();
+        const names = ['Snoozed', 'INBOX.Snoozed', 'INBOX/Snoozed', 'Notes'];
+
+        for (const box of mailboxes) {
+            if (names.includes(box.path)) {
+                return box.path;
+            }
+        }
+        return 'Snoozed';
+    }
+
     async _getImapPath(folder) {
         if (folder === 'INBOX') return 'INBOX';
         if (folder === 'Sent') return this._findSentFolder();
         if (folder === 'Drafts') return this._findDraftsFolder();
         if (folder === 'Trash') return this._findTrashFolder();
         if (folder === 'Spam') return this._findJunkFolder();
+        if (folder === 'Snoozed') return this._findSnoozedFolder();
         // Fallback to simple mapping or proper name
         return this._mapFolderName(folder);
     }

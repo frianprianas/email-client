@@ -74,4 +74,24 @@ export const aliasAPI = {
     deleteAlias: (id) => api.delete(`/alias/${id}`),
 };
 
+// Templates API
+export const templatesAPI = {
+    getAll: () => api.get('/templates'),
+    create: (data) => api.post('/templates', data),
+    delete: (id) => api.delete(`/templates/${id}`),
+};
+
+// Snooze API
+export const snoozeAPI = {
+    snooze: (folder, uid, snoozeUntil) =>
+        api.post(`/snooze/${encodeURIComponent(folder)}/${uid}`, { snoozeUntil }),
+};
+
+// Schedule API
+export const scheduleAPI = {
+    schedule: (data) => api.post('/schedule', data),
+    list: () => api.get('/schedule'),
+    cancel: (id) => api.delete(`/schedule/${id}`),
+};
+
 export default api;

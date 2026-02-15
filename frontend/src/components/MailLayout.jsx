@@ -34,25 +34,42 @@ const MailLayout = () => {
     const [miniDrawer, setMiniDrawer] = useState(false);
     const prevUnseenRef = useRef(null);
     const pollTimerRef = useRef(null);
+    const activeRequestId = useRef(0);
+
+    const latestUidRef = useRef(null);
 
     const showSnackbar = useCallback((message, severity = 'info') => {
         setSnackbar({ open: true, message, severity });
     }, []);
 
     const fetchMessages = useCallback(async (folder = currentFolder, page = 1) => {
+        const requestId = ++activeRequestId.current;
         setLoading(true);
         try {
             const res = await mailAPI.getMessages(folder, page, 50);
+
+            // If a newer request has started, ignore this result
+            if (requestId !== activeRequestId.current) return;
+
             setMessages(res.data.messages || []);
             setTotalMessages(res.data.total || 0);
             setUnseenCount(res.data.unseen || 0);
             setTotalPages(res.data.totalPages || 0);
             setCurrentPage(page);
+
+            // Update latest known UID if in INBOX
+            if (folder === 'INBOX' && res.data.messages && res.data.messages.length > 0) {
+                latestUidRef.current = res.data.messages[0].uid;
+            }
+
         } catch (error) {
+            if (requestId !== activeRequestId.current) return;
             console.error('Failed to fetch messages:', error);
             showSnackbar('Failed to load messages', 'error');
         } finally {
-            setLoading(false);
+            if (requestId === activeRequestId.current) {
+                setLoading(false);
+            }
         }
     }, [currentFolder, showSnackbar]);
 
@@ -60,7 +77,7 @@ const MailLayout = () => {
         fetchMessages(currentFolder, 1);
     }, [currentFolder]);
 
-    // Auto-poll for new emails every 30 seconds
+    // Auto-poll for new emails every 8 seconds
     useEffect(() => {
         // Request browser notification permission
         if ('Notification' in window && Notification.permission === 'default') {
@@ -69,37 +86,54 @@ const MailLayout = () => {
 
         const pollNewMails = async () => {
             try {
+                // Poll INBOX for changes
                 const res = await mailAPI.getMessages('INBOX', 1, 50);
                 const newUnseen = res.data.unseen || 0;
+                const newMessages = res.data.messages || [];
+                const topUid = newMessages.length > 0 ? newMessages[0].uid : null;
 
+                let hasNewMail = false;
+
+                // Check if Unseen count increased
                 if (prevUnseenRef.current !== null && newUnseen > prevUnseenRef.current) {
                     const diff = newUnseen - prevUnseenRef.current;
                     showSnackbar(`📬 ${diff} new email${diff > 1 ? 's' : ''} received!`, 'info');
 
-                    // Browser notification if tab is not focused
+                    // Browser notification
                     if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
                         new Notification('BaknusMail', {
                             body: `You have ${diff} new email${diff > 1 ? 's' : ''}`,
                             icon: '/baknus-logo.png',
                         });
                     }
+                    hasNewMail = true;
+                }
 
-                    // Auto-refresh if viewing INBOX
-                    if (currentFolder === 'INBOX') {
-                        setMessages(res.data.messages || []);
-                        setTotalMessages(res.data.total || 0);
-                        setTotalPages(res.data.totalPages || 0);
-                    }
+                // Check if the latest message UID is different (new mail arrived at top)
+                if (latestUidRef.current !== null && topUid !== null && topUid !== latestUidRef.current) {
+                    hasNewMail = true;
                 }
 
                 prevUnseenRef.current = newUnseen;
-                setUnseenCount(newUnseen);
+
+                // Update UI if viewing INBOX and change detected
+                if (hasNewMail && currentFolder === 'INBOX') {
+                    setMessages(newMessages);
+                    setTotalMessages(res.data.total || 0);
+                    setTotalPages(res.data.totalPages || 0);
+                    setUnseenCount(newUnseen);
+                    if (topUid) latestUidRef.current = topUid;
+                } else {
+                    // Just update the unseen badge counter if not in inbox or no list update needed
+                    setUnseenCount(newUnseen);
+                }
+
             } catch (err) {
                 // Silent fail on poll
             }
         };
 
-        pollTimerRef.current = setInterval(pollNewMails, 30000);
+        pollTimerRef.current = setInterval(pollNewMails, 8000);
 
         return () => {
             if (pollTimerRef.current) clearInterval(pollTimerRef.current);
@@ -108,6 +142,12 @@ const MailLayout = () => {
 
     const handleFolderChange = (folder) => {
         setCurrentFolder(folder);
+        // Clear state immediately to prevent stale data display
+        setMessages([]);
+        setTotalMessages(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+
         setSelectedMessage(null);
         setSearchQuery('');
         navigate('/');
@@ -244,6 +284,20 @@ const MailLayout = () => {
         }
     };
 
+    const handleMoveToInbox = async (msg) => {
+        try {
+            await mailAPI.moveMessage(msg.uid, currentFolder, 'INBOX');
+            setMessages(prev => prev.filter(m => m.uid !== msg.uid));
+            if (selectedMessage?.uid === msg.uid) {
+                setSelectedMessage(null);
+                navigate('/');
+            }
+            showSnackbar('Message moved to Inbox', 'success');
+        } catch (error) {
+            showSnackbar('Failed to move message', 'error');
+        }
+    };
+
     const handleRefresh = () => {
         fetchMessages(currentFolder, currentPage);
         showSnackbar('Refreshing...', 'info');
@@ -342,6 +396,7 @@ const MailLayout = () => {
                                     onToggleRead={handleToggleRead}
                                     onDelete={handleDeleteMessage}
                                     onArchive={handleArchive}
+                                    onMoveToInbox={handleMoveToInbox}
                                     onRefresh={handleRefresh}
                                     totalMessages={totalMessages}
                                     currentPage={currentPage}
@@ -359,6 +414,7 @@ const MailLayout = () => {
                                     onReply={(data) => handleCompose(data)}
                                     onDelete={handleDeleteMessage}
                                     onArchive={handleArchive}
+                                    onMoveToInbox={handleMoveToInbox}
                                     onToggleStar={handleToggleStar}
                                     showSnackbar={showSnackbar}
                                 />

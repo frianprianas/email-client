@@ -17,13 +17,17 @@ import {
     OpenInNew as OpenIcon,
     AttachFile as AttachIcon,
     Download as DownloadIcon,
-    MarkunreadMailbox as UnreadIcon
+    MarkunreadMailbox as UnreadIcon,
+    MoveToInbox as MoveToInboxIcon,
+    AutoAwesome as AutoAwesomeIcon,
+    Snooze as SnoozeIcon
 } from '@mui/icons-material';
+import { Menu, MenuItem } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays, addHours, setHours, setMinutes, nextMonday } from 'date-fns';
 import { useParams } from 'react-router-dom';
 import DOMPurify from 'dompurify';
-import { mailAPI } from '../api';
+import { mailAPI, snoozeAPI } from '../api';
 
 const getAvatarColor = (name) => {
     const colors = [
@@ -39,7 +43,7 @@ const formatFileSize = (bytes) => {
     return (bytes / 1048576).toFixed(1) + ' MB';
 };
 
-const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleStar, showSnackbar }) => {
+const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onMoveToInbox, onToggleStar, showSnackbar }) => {
     const { uid } = useParams();
     const theme = useTheme();
     const c = theme.palette.custom;
@@ -52,6 +56,8 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
             try {
                 const res = await mailAPI.getMessage(folder, uid);
                 setMessage(res.data);
+                // Reset summary when message changes
+                setSummary(null);
             } catch (error) {
                 console.error('Failed to fetch message:', error);
                 showSnackbar('Failed to load message', 'error');
@@ -62,6 +68,64 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
 
         if (uid) fetchMessage();
     }, [uid, folder]);
+
+    const [summary, setSummary] = useState(null);
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [snoozeAnchorEl, setSnoozeAnchorEl] = useState(null);
+
+    const handleSnoozeClick = (event) => setSnoozeAnchorEl(event.currentTarget);
+    const handleCloseSnooze = () => setSnoozeAnchorEl(null);
+
+    const handleSnoozeConfirm = async (date) => {
+        try {
+            await snoozeAPI.snooze(folder, uid, date);
+            showSnackbar('Email snoozed', 'success');
+            onBack(); // Go back to list
+        } catch (error) {
+            console.error('Snooze failed:', error);
+            showSnackbar('Failed to snooze email', 'error');
+        } finally {
+            handleCloseSnooze();
+        }
+    };
+
+    const getSnoozeOptions = () => {
+        const now = new Date();
+        const tomorrow = setMinutes(setHours(addDays(now, 1), 8), 0); // 8 AM tomorrow
+        const laterToday = addHours(now, 4);
+        const nextWeek = setMinutes(setHours(nextMonday(now), 8), 0); // 8 AM next Monday
+
+        return [
+            { label: 'Later today (+4h)', date: laterToday },
+            { label: 'Tomorrow morning (8:00 AM)', date: tomorrow },
+            { label: 'Next week (Mon 8:00 AM)', date: nextWeek }
+        ];
+    };
+
+
+    const handleSummarize = () => {
+        setIsSummarizing(true);
+        // Mock AI delay
+        setTimeout(() => {
+            const cleanText = message.text || message.html?.replace(/<[^>]*>/g, '') || '';
+            const sentences = cleanText.split(/[.!?]+/).filter(s => s.trim().length > 10).slice(0, 2);
+
+            setSummary({
+                text: sentences.join('. ') + '.',
+                points: [
+                    "Action required by Friday",
+                    "Review attached documents"
+                ]
+            });
+            setIsSummarizing(false);
+        }, 1500);
+    };
+
+    const smartReplies = [
+        "Received, thank you.",
+        "I'll look into it.",
+        "Can you provide more details?"
+    ];
 
     const handleReply = () => {
         if (!message) return;
@@ -163,9 +227,21 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
                         <BackIcon />
                     </IconButton>
                 </Tooltip>
+                {(folder === 'Spam' || folder === 'Trash') && (
+                    <Tooltip title="Move to Inbox">
+                        <IconButton size="small" onClick={() => onMoveToInbox(message)}>
+                            <MoveToInboxIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                )}
                 <Tooltip title="Archive">
                     <IconButton size="small" onClick={() => onArchive(message)}>
                         <ArchiveIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+                <Tooltip title="Snooze">
+                    <IconButton size="small" onClick={handleSnoozeClick}>
+                        <SnoozeIcon fontSize="small" />
                     </IconButton>
                 </Tooltip>
                 <Tooltip title="Delete">
@@ -192,6 +268,21 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
                     </IconButton>
                 </Tooltip>
             </Box>
+
+            <Menu
+                anchorEl={snoozeAnchorEl}
+                open={Boolean(snoozeAnchorEl)}
+                onClose={handleCloseSnooze}
+            >
+                <Box sx={{ px: 2, py: 1, borderBottom: `1px solid ${c.borderLight}` }}>
+                    <Typography variant="subtitle2" color="text.secondary">Snooze until...</Typography>
+                </Box>
+                {getSnoozeOptions().map((opt, i) => (
+                    <MenuItem key={i} onClick={() => handleSnoozeConfirm(opt.date)}>
+                        {opt.label}
+                    </MenuItem>
+                ))}
+            </Menu>
 
             {/* Message Content */}
             <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, sm: 4, md: 6 }, py: 3 }}>
@@ -254,6 +345,63 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
                     >
                         {message.date ? format(new Date(message.date), 'MMM d, yyyy, h:mm a') : ''}
                     </Typography>
+                </Box>
+
+                {/* AI Summary Section */}
+                <Box sx={{ mb: 3 }}>
+                    {!summary && !isSummarizing ? (
+                        <Button
+                            startIcon={<AutoAwesomeIcon />}
+                            onClick={handleSummarize}
+                            size="small"
+                            sx={{
+                                color: c.accent,
+                                bgcolor: c.chipBg,
+                                borderRadius: 4,
+                                textTransform: 'none',
+                                fontSize: '0.8125rem',
+                                '&:hover': { bgcolor: c.chipHoverBg }
+                            }}
+                        >
+                            Summarize with AI
+                        </Button>
+                    ) : (
+                        <Box sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(138, 180, 248, 0.1)' : '#f0f7ff',
+                            border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(138, 180, 248, 0.2)' : '#d0e1fd'}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <AutoAwesomeIcon sx={{ fontSize: 16, color: c.accent }} />
+                                <Typography variant="subtitle2" color={c.accent}>AI Summary</Typography>
+                                {isSummarizing && <CircularProgress size={12} thickness={5} sx={{ color: c.accent }} />}
+                            </Box>
+
+                            {summary ? (
+                                <>
+                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                        Key Points:
+                                    </Typography>
+                                    <Box component="ul" sx={{ m: 0, pl: 2.5, '& li': { mb: 0.5 } }}>
+                                        {summary.points.map((pt, i) => (
+                                            <li key={i}>
+                                                <Typography variant="body2">{pt}</Typography>
+                                            </li>
+                                        ))}
+                                    </Box>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+                                        {summary.text}
+                                    </Typography>
+                                </>
+                            ) : (
+                                <Typography variant="body2" color="text.secondary">Generating summary...</Typography>
+                            )}
+                        </Box>
+                    )}
                 </Box>
 
                 {/* HTML Body */}
@@ -320,6 +468,37 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
                     </Box>
                 )}
 
+                {/* Smart Replies */}
+                <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {smartReplies.map((reply, index) => (
+                        <Chip
+                            key={index}
+                            icon={<AutoAwesomeIcon sx={{ fontSize: 14 }} />}
+                            label={reply}
+                            onClick={() => onReply({
+                                to: message.from.map(f => f.address),
+                                subject: message.subject.startsWith('Re:') ? message.subject : `Re: ${message.subject}`,
+                                inReplyTo: message.headers?.messageId,
+                                references: message.headers?.references,
+                                // Pre-fill with smart reply
+                                quotedHtml: `<p>${reply}</p><br/><br/><div style="border-left:2px solid ${c.accent};padding-left:12px;margin-left:0;color:${theme.palette.text.secondary}">
+                                On ${message.date ? format(new Date(message.date), 'EEE, MMM d, yyyy \'at\' h:mm a') : ''}, ${message.from?.[0]?.name || message.from?.[0]?.address} wrote:<br/>
+                                ${message.html || message.text}
+                              </div>`
+                            })}
+                            sx={{
+                                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                border: `1px solid ${c.borderLight}`,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                                    borderColor: c.accent
+                                }
+                            }}
+                        />
+                    ))}
+                </Box>
+
                 {/* Reply Actions */}
                 <Divider sx={{ my: 3 }} />
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -376,7 +555,7 @@ const MessageView = ({ folder, onBack, onReply, onDelete, onArchive, onToggleSta
                     </Button>
                 </Box>
             </Box>
-        </Box>
+        </Box >
     );
 };
 

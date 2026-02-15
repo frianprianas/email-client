@@ -17,7 +17,8 @@ import {
     MoreVert as MoreIcon,
     AttachFile as AttachIcon,
     LabelImportant as ImportantIcon,
-    LabelImportantOutlined as ImportantOutlineIcon
+    LabelImportantOutlined as ImportantOutlineIcon,
+    MoveToInbox as MoveToInboxIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { format, isToday, isThisYear, parseISO } from 'date-fns';
@@ -58,6 +59,7 @@ const MessageList = ({
     onToggleRead,
     onDelete,
     onArchive,
+    onMoveToInbox,
     onRefresh,
     totalMessages,
     currentPage,
@@ -118,6 +120,16 @@ const MessageList = ({
 
                 {selected.length > 0 ? (
                     <Box sx={{ display: 'flex', gap: 0.5, ml: 1 }}>
+                        {(currentFolder === 'Spam' || currentFolder === 'Trash') && (
+                            <Tooltip title="Move to Inbox">
+                                <IconButton size="small" onClick={() => selected.forEach(uid => {
+                                    const msg = messages.find(m => m.uid === uid);
+                                    if (msg) onMoveToInbox(msg);
+                                })}>
+                                    <MoveToInboxIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
                         <Tooltip title="Archive">
                             <IconButton size="small" onClick={() => selected.forEach(uid => {
                                 const msg = messages.find(m => m.uid === uid);
@@ -352,6 +364,17 @@ const MessageList = ({
                             {/* Action buttons on hover */}
                             {isHovered ? (
                                 <Box sx={{ display: 'flex', gap: 0, flexShrink: 0 }}>
+                                    {(currentFolder === 'Spam' || currentFolder === 'Trash') && (
+                                        <Tooltip title="Move to Inbox">
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => { e.stopPropagation(); onMoveToInbox(msg); }}
+                                                sx={{ color: 'text.secondary' }}
+                                            >
+                                                <MoveToInboxIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
                                     <Tooltip title="Archive">
                                         <IconButton
                                             size="small"
