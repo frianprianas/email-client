@@ -204,6 +204,10 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
             return;
         }
 
+        // SNAPSHOT CONTENT NOW before UI changes
+        const currentBody = getBodyContent();
+        bodyContentRef.current = currentBody;
+
         // Start Undo Flow
         setShowUndoUI(true);
         setUndoCount(5);
