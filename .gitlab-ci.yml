@@ -24,7 +24,7 @@ deploy_production:
           git pull origin main;
         fi;
         docker compose down;
-        docker compose up -d --build;
+        docker compose up -d --build --force-recreate;
         docker system prune -af;
       "
   only:

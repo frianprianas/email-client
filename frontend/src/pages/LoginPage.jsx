@@ -252,7 +252,7 @@ const LoginPage = () => {
                             color: 'text.disabled',
                         }}
                     >
-                        Use your Mailcow credentials to sign in
+                        Develoved by IT Support SMK Baknus 666
                     </Typography>
                 </Paper>
             </Fade>
