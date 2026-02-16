@@ -7,7 +7,9 @@ import {
     Email as EmailIcon,
     Lock as LockIcon,
     Visibility,
-    VisibilityOff
+    VisibilityOff,
+    LightMode as LightModeIcon,
+    DarkMode as DarkModeIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../App';
@@ -16,7 +18,7 @@ import logo from '../assets/logo.png';
 const MAIL_DOMAIN = 'smk.baktinusantara666.sch.id';
 
 const LoginPage = () => {
-    const { login } = useAuth();
+    const { login, toggleTheme, themeMode } = useAuth();
     const theme = useTheme();
     const c = theme.palette.custom;
     const [username, setUsername] = useState('');
@@ -52,6 +54,19 @@ const LoginPage = () => {
                 overflow: 'hidden',
             }}
         >
+            <IconButton
+                onClick={toggleTheme}
+                sx={{
+                    position: 'absolute',
+                    top: 16,
+                    right: 16,
+                    color: theme.palette.text.secondary,
+                    zIndex: 10
+                }}
+            >
+                {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+
             {/* ... background elements ... */}
             <Box sx={{
                 position: 'absolute',
