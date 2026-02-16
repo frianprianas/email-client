@@ -15,12 +15,12 @@ deploy_production:
     - echo "Deploying to production server..."
     - |
       ssh $SSH_USER@$SSH_HOST "
-        if [ ! -d '$PROJECT_PATH' ]; then
-          git clone https://gitlab.com/frianprianas-group/mail-baknus.git '$PROJECT_PATH';
-          cd '$PROJECT_PATH';
+        if [ ! -d '/root/baknusmail/mail-baknus' ]; then
+          git clone https://gitlab.com/frianprianas-group/mail-baknus.git '/root/baknusmail/mail-baknus';
+          cd '/root/baknusmail/mail-baknus';
           cp .env.docker .env;
         else
-          cd '$PROJECT_PATH';
+          cd '/root/baknusmail/mail-baknus';
           git pull origin main;
         fi;
         docker compose down;
