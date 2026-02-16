@@ -378,7 +378,8 @@ const MailLayout = () => {
                     overflow: 'hidden',
                     display: 'flex',
                     flexDirection: 'column',
-                    ml: isMobile ? 0 : (miniDrawer ? '72px' : `${DRAWER_WIDTH}px`),
+                    width: '100%',
+                    ml: 0, // Drawer is in flex flow, no margin needed
                     transition: 'margin-left 0.2s ease',
                 }}
             >
