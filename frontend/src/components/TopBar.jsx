@@ -13,6 +13,7 @@ import {
     HelpOutline as HelpIcon,
     DarkMode as DarkModeIcon,
     LightMode as LightModeIcon,
+    CameraAlt as CameraIcon,
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../App';
@@ -205,29 +206,63 @@ const TopBar = ({ onMenuClick, onSearch, searchQuery }) => {
                     transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                     anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                 >
-                    <Box sx={{ px: 2, py: 1.5, textAlign: 'center' }}>
-                        <Avatar
-                            src={user?.avatar || undefined}
+                    <Box sx={{ px: 2, py: 2, textAlign: 'center' }}>
+                        <Box
                             sx={{
-                                width: 56,
-                                height: 56,
+                                position: 'relative',
+                                width: 80,
+                                height: 80,
                                 mx: 'auto',
-                                mb: 1,
-                                fontSize: '1.5rem',
-                                fontWeight: 600,
-                                bgcolor: getAvatarColor(user?.displayName || user?.email),
+                                mb: 1.5,
+                                cursor: 'pointer',
+                                '&:hover .avatar-overlay': { opacity: 1 },
                             }}
+                            onClick={() => { setAnchorEl(null); setSettingsOpen(true); }}
                         >
-                            {getInitials(user?.displayName || user?.email)}
-                        </Avatar>
-                        <Typography variant="subtitle1" fontWeight={500}>
+                            <Avatar
+                                src={user?.avatar || undefined}
+                                sx={{
+                                    width: '100%',
+                                    height: '100%',
+                                    fontSize: '2rem',
+                                    fontWeight: 600,
+                                    bgcolor: getAvatarColor(user?.displayName || user?.email),
+                                }}
+                            >
+                                {getInitials(user?.displayName || user?.email)}
+                            </Avatar>
+                            <Box
+                                className="avatar-overlay"
+                                sx={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    borderRadius: '50%',
+                                    bgcolor: 'rgba(0,0,0,0.4)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: 0,
+                                    transition: 'opacity 0.2s',
+                                }}
+                            >
+                                <CameraIcon sx={{ color: '#fff', fontSize: 24 }} />
+                            </Box>
+                        </Box>
+                        <Typography variant="subtitle1" fontWeight={600} sx={{ lineHeight: 1.2 }}>
                             {user?.displayName}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             {user?.email}
                         </Typography>
                     </Box>
                     <Divider />
+                    <MenuItem onClick={() => { setAnchorEl(null); setSettingsOpen(true); }}>
+                        <ListItemIcon><CameraIcon fontSize="small" /></ListItemIcon>
+                        <ListItemText>Change profile photo</ListItemText>
+                    </MenuItem>
                     <MenuItem onClick={() => { setAnchorEl(null); setSettingsOpen(true); }}>
                         <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
                         <ListItemText>Settings</ListItemText>
@@ -238,6 +273,7 @@ const TopBar = ({ onMenuClick, onSearch, searchQuery }) => {
                         </ListItemIcon>
                         <ListItemText>{themeMode === 'dark' ? 'Light mode' : 'Dark mode'}</ListItemText>
                     </MenuItem>
+                    <Divider />
                     <MenuItem
                         onClick={() => { setAnchorEl(null); logout(); }}
                         sx={{ color: 'error.main' }}

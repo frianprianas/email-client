@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Box, List, ListItemButton, ListItemIcon, ListItemText,
-    Typography, Badge, Button, Divider, Tooltip
+    Typography, Badge, Button, Divider, Tooltip, Avatar
 } from '@mui/material';
 import {
     Inbox as InboxIcon,
@@ -18,6 +18,7 @@ import {
     Folder as FolderIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
+import { useAuth } from '../App';
 
 const folders = [
     { id: 'INBOX', label: 'Inbox', icon: InboxIcon, showBadge: true },
@@ -35,6 +36,21 @@ const folders = [
 const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDrawer }) => {
     const theme = useTheme();
     const c = theme.palette.custom;
+    const { user } = useAuth();
+
+    const getInitials = (name) => {
+        if (!name) return '?';
+        const parts = name.trim().split(/\s+/);
+        return parts.length >= 2
+            ? (parts[0][0] + parts[1][0]).toUpperCase()
+            : name.charAt(0).toUpperCase();
+    };
+
+    const getAvatarColor = (name) => {
+        const colors = ['#8ab4f8', '#81c995', '#f28b82', '#fdd663', '#c58af9', '#78d9ec', '#fcad70'];
+        const index = (name || '').charCodeAt(0) % colors.length;
+        return colors[index];
+    };
 
     return (
         <Box sx={{
@@ -95,7 +111,7 @@ const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDr
             </Box>
 
             {/* Folder List */}
-            <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <List disablePadding>
                     {folders.map((folder, index) => {
                         if (folder.divider) {
@@ -188,6 +204,43 @@ const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDr
                         );
                     })}
                 </List>
+
+                {/* User Profile Section (Bottom) */}
+                {!miniDrawer && (
+                    <Box sx={{
+                        p: 1.5,
+                        mt: 'auto',
+                        mx: 1,
+                        mb: 1,
+                        borderRadius: 3,
+                        bgcolor: 'rgba(0,0,0,0.03)',
+                        border: `1px solid ${c.borderLighter}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                    }}>
+                        <Avatar
+                            src={user?.avatar || undefined}
+                            sx={{
+                                width: 32,
+                                height: 32,
+                                bgcolor: getAvatarColor(user?.displayName || user?.email),
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                            }}
+                        >
+                            {getInitials(user?.displayName || user?.email)}
+                        </Avatar>
+                        <Box sx={{ overflow: 'hidden' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {user?.displayName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                {user?.email}
+                            </Typography>
+                        </Box>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
