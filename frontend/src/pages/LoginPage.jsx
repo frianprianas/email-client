@@ -26,6 +26,7 @@ const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [shake, setShake] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -37,6 +38,8 @@ const LoginPage = () => {
             await login(fullEmail, password);
         } catch (err) {
             setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+            setShake(true);
+            setTimeout(() => setShake(false), 500);
         } finally {
             setLoading(false);
         }
@@ -105,6 +108,14 @@ const LoginPage = () => {
                         border: `1px solid ${c.dialogBorder}`,
                         position: 'relative',
                         zIndex: 1,
+                        animation: shake ? 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both' : 'none',
+                        transform: 'translate3d(0, 0, 0)',
+                        '@keyframes shake': {
+                            '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(4px, 0, 0)' },
+                        },
                     }}
                 >
                     {/* ... Logo Section ... */}

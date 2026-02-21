@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, Box, Typography,
     TextField, Button, IconButton, CircularProgress, Alert,
-    Divider, Chip, Tooltip, InputAdornment, Avatar
+    Divider, Chip, Tooltip, InputAdornment, Avatar, Snackbar
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -65,6 +65,8 @@ const SettingsDialog = ({ open, onClose }) => {
     const [pwOtpStep, setPwOtpStep] = useState(0); // 0: form, 1: otp
     const [changingPassword, setChangingPassword] = useState(false);
     const [showPw, setShowPw] = useState(false);
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
 
     // Fetch aliases when dialog opens
     useEffect(() => {
@@ -325,6 +327,8 @@ const SettingsDialog = ({ open, onClose }) => {
                 otp: passwordOtp
             });
             setSuccess(res.data.message);
+            setToastMessage('Password berhasil diperbarui!');
+            setShowSuccessToast(true);
             setPwOtpStep(0);
             setNewPassword('');
             setConfirmPassword('');
@@ -337,688 +341,710 @@ const SettingsDialog = ({ open, onClose }) => {
     };
 
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            maxWidth="sm"
-            fullWidth
-            PaperProps={{
-                sx: {
-                    borderRadius: 3,
-                    bgcolor: 'background.paper',
-                    border: `1px solid ${c.dialogBorder}`,
-                    backgroundImage: 'none',
-                },
-            }}
-        >
-            <DialogTitle sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                pb: 1,
-            }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem' }}>
-                    Settings
-                </Typography>
-                <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
-                    <CloseIcon />
-                </IconButton>
-            </DialogTitle>
+        <>
+            <Dialog
+                open={open}
+                onClose={onClose}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        bgcolor: 'background.paper',
+                        border: `1px solid ${c.dialogBorder}`,
+                        backgroundImage: 'none',
+                    },
+                }}
+            >
+                <DialogTitle sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    pb: 1,
+                }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem' }}>
+                        Settings
+                    </Typography>
+                    <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
 
-            <DialogContent sx={{ px: 3, pb: 3 }}>
-                {/* Alerts */}
-                {error && (
-                    <Alert
-                        severity="error"
-                        onClose={() => setError('')}
-                        sx={{
-                            mb: 2,
+                <DialogContent sx={{ px: 3, pb: 3 }}>
+                    {/* Alerts */}
+                    {error && (
+                        <Alert
+                            severity="error"
+                            onClose={() => setError('')}
+                            sx={{
+                                mb: 2,
+                                borderRadius: 2,
+                                bgcolor: c.errorBg,
+                                border: `1px solid ${c.errorBorder}`,
+                            }}
+                        >
+                            {error}
+                        </Alert>
+                    )}
+                    {success && (
+                        <Alert
+                            severity="success"
+                            onClose={() => setSuccess('')}
+                            sx={{
+                                mb: 2,
+                                borderRadius: 2,
+                                bgcolor: c.successBg,
+                                border: `1px solid ${c.successBorder}`,
+                            }}
+                        >
+                            {success}
+                        </Alert>
+                    )}
+
+                    {/* Profile Section */}
+                    <Box sx={{ mb: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <PersonIcon sx={{ color: c.accent, fontSize: 20 }} />
+                            <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                                Profile
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{
+                            p: 2.5,
                             borderRadius: 2,
-                            bgcolor: c.errorBg,
-                            border: `1px solid ${c.errorBorder}`,
-                        }}
-                    >
-                        {error}
-                    </Alert>
-                )}
-                {success && (
-                    <Alert
-                        severity="success"
-                        onClose={() => setSuccess('')}
-                        sx={{
-                            mb: 2,
-                            borderRadius: 2,
-                            bgcolor: c.successBg,
-                            border: `1px solid ${c.successBorder}`,
-                        }}
-                    >
-                        {success}
-                    </Alert>
-                )}
-
-                {/* Profile Section */}
-                <Box sx={{ mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                        <PersonIcon sx={{ color: c.accent, fontSize: 20 }} />
-                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
-                            Profile
-                        </Typography>
-                    </Box>
-
-                    <Box sx={{
-                        p: 2.5,
-                        borderRadius: 2,
-                        bgcolor: c.cardBg,
-                        border: `1px solid ${c.cardBorder}`,
-                    }}>
-                        {/* Avatar & Email */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
-                            {/* Clickable Avatar */}
-                            <Box sx={{ position: 'relative' }}>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    ref={avatarInputRef}
-                                    onChange={handleAvatarUpload}
-                                    style={{ display: 'none' }}
-                                />
-                                <Avatar
-                                    src={user?.avatar || undefined}
-                                    sx={{
-                                        width: 64,
-                                        height: 64,
-                                        bgcolor: getAvatarColor(displayName || user?.email),
-                                        fontSize: '1.5rem',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        transition: 'opacity 0.2s',
-                                        '&:hover': { opacity: 0.8 },
-                                    }}
-                                    onClick={() => avatarInputRef.current?.click()}
-                                >
-                                    {getInitials(displayName || user?.email)}
-                                </Avatar>
-                                {/* Camera overlay */}
-                                <Box
-                                    onClick={() => avatarInputRef.current?.click()}
-                                    sx={{
-                                        position: 'absolute',
-                                        bottom: -2,
-                                        right: -2,
-                                        width: 24,
-                                        height: 24,
-                                        borderRadius: '50%',
-                                        bgcolor: c.accent,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: 'pointer',
-                                        border: `2px solid ${c.cameraBtnBorder}`,
-                                        '&:hover': { opacity: 0.85 },
-                                    }}
-                                >
-                                    <CameraIcon sx={{ fontSize: 14, color: c.avatarText }} />
+                            bgcolor: c.cardBg,
+                            border: `1px solid ${c.cardBorder}`,
+                        }}>
+                            {/* Avatar & Email */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
+                                {/* Clickable Avatar */}
+                                <Box sx={{ position: 'relative' }}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        ref={avatarInputRef}
+                                        onChange={handleAvatarUpload}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <Avatar
+                                        src={user?.avatar || undefined}
+                                        sx={{
+                                            width: 64,
+                                            height: 64,
+                                            bgcolor: getAvatarColor(displayName || user?.email),
+                                            fontSize: '1.5rem',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'opacity 0.2s',
+                                            '&:hover': { opacity: 0.8 },
+                                        }}
+                                        onClick={() => avatarInputRef.current?.click()}
+                                    >
+                                        {getInitials(displayName || user?.email)}
+                                    </Avatar>
+                                    {/* Camera overlay */}
+                                    <Box
+                                        onClick={() => avatarInputRef.current?.click()}
+                                        sx={{
+                                            position: 'absolute',
+                                            bottom: -2,
+                                            right: -2,
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: '50%',
+                                            bgcolor: c.accent,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            border: `2px solid ${c.cameraBtnBorder}`,
+                                            '&:hover': { opacity: 0.85 },
+                                        }}
+                                    >
+                                        <CameraIcon sx={{ fontSize: 14, color: c.avatarText }} />
+                                    </Box>
+                                </Box>
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                        {user?.email}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.disabled">
+                                        Click avatar to upload photo (max 2MB)
+                                    </Typography>
+                                    {user?.avatar && (
+                                        <Box>
+                                            <Button
+                                                size="small"
+                                                onClick={handleRemoveAvatar}
+                                                startIcon={<RemoveIcon sx={{ fontSize: 14 }} />}
+                                                sx={{
+                                                    mt: 0.5,
+                                                    fontSize: '0.7rem',
+                                                    color: 'error.main',
+                                                    textTransform: 'none',
+                                                    p: 0,
+                                                    minWidth: 'auto',
+                                                    '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                }}
+                                            >
+                                                Remove photo
+                                            </Button>
+                                        </Box>
+                                    )}
                                 </Box>
                             </Box>
-                            <Box sx={{ flex: 1 }}>
-                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                    {user?.email}
-                                </Typography>
-                                <Typography variant="caption" color="text.disabled">
-                                    Click avatar to upload photo (max 2MB)
-                                </Typography>
-                                {user?.avatar && (
-                                    <Box>
-                                        <Button
-                                            size="small"
-                                            onClick={handleRemoveAvatar}
-                                            startIcon={<RemoveIcon sx={{ fontSize: 14 }} />}
-                                            sx={{
-                                                mt: 0.5,
-                                                fontSize: '0.7rem',
-                                                color: 'error.main',
-                                                textTransform: 'none',
-                                                p: 0,
-                                                minWidth: 'auto',
-                                                '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                            }}
-                                        >
-                                            Remove photo
-                                        </Button>
-                                    </Box>
-                                )}
+
+                            {/* Display Name */}
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                                <TextField
+                                    size="small"
+                                    label="Display Name"
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
+                                    fullWidth
+                                    placeholder="e.g. John Doe"
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                                    }}
+                                />
+                                <Button
+                                    variant="contained"
+                                    onClick={handleSaveProfile}
+                                    disabled={savingProfile || !displayName.trim() || displayName.trim() === user?.displayName}
+                                    startIcon={savingProfile ? <CircularProgress size={16} /> : <SaveIcon />}
+                                    size="small"
+                                    sx={{
+                                        borderRadius: 2,
+                                        px: 2,
+                                        minHeight: 40,
+                                        background: c.btnGradient,
+                                        '&:hover': {
+                                            background: c.btnHoverGradient,
+                                        },
+                                        textTransform: 'none',
+                                        fontWeight: 500,
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    Save
+                                </Button>
                             </Box>
                         </Box>
+                    </Box>
 
-                        {/* Display Name */}
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                            <TextField
-                                size="small"
-                                label="Display Name"
-                                value={displayName}
-                                onChange={(e) => setDisplayName(e.target.value)}
-                                fullWidth
-                                placeholder="e.g. John Doe"
-                                sx={{
-                                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                                }}
-                            />
-                            <Button
-                                variant="contained"
-                                onClick={handleSaveProfile}
-                                disabled={savingProfile || !displayName.trim() || displayName.trim() === user?.displayName}
-                                startIcon={savingProfile ? <CircularProgress size={16} /> : <SaveIcon />}
-                                size="small"
-                                sx={{
-                                    borderRadius: 2,
-                                    px: 2,
-                                    minHeight: 40,
-                                    background: c.btnGradient,
-                                    '&:hover': {
-                                        background: c.btnHoverGradient,
-                                    },
-                                    textTransform: 'none',
-                                    fontWeight: 500,
-                                    whiteSpace: 'nowrap',
-                                }}
-                            >
-                                Save
-                            </Button>
+                    <Divider sx={{ mb: 3 }} />
+
+                    {/* Password Change Section */}
+                    <Box sx={{ mb: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <LockIcon sx={{ color: c.accent, fontSize: 20 }} />
+                            <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                                Ganti Password Email
+                            </Typography>
                         </Box>
-                    </Box>
-                </Box>
 
-                <Divider sx={{ mb: 3 }} />
-
-                {/* Password Change Section */}
-                <Box sx={{ mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                        <LockIcon sx={{ color: c.accent, fontSize: 20 }} />
-                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
-                            Ganti Password Email
-                        </Typography>
-                    </Box>
-
-                    <Box sx={{
-                        p: 2.5,
-                        borderRadius: 2,
-                        bgcolor: c.cardBg,
-                        border: `1px solid ${c.cardBorder}`,
-                    }}>
-                        {!user?.isPhoneVerified ? (
-                            <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                                Harap verifikasi nomor WhatsApp terlebih dahulu untuk dapat mengganti password.
-                            </Alert>
-                        ) : (
-                            <Box>
-                                {pwOtpStep === 0 ? (
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        <TextField
-                                            size="small"
-                                            label="Password Baru"
-                                            type={showPw ? 'text' : 'password'}
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                            fullWidth
-                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                                            InputProps={{
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={() => setShowPw(!showPw)}
-                                                            edge="end"
-                                                        >
-                                                            {showPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                                                        </IconButton>
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                        />
-                                        <TextField
-                                            size="small"
-                                            label="Konfirmasi Password Baru"
-                                            type={showPw ? 'text' : 'password'}
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            fullWidth
-                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                                        />
-                                        <Button
-                                            variant="contained"
-                                            onClick={() => handleRequestOtp('password_change')}
-                                            disabled={requestingOtp || !newPassword || !confirmPassword}
-                                            startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
-                                            sx={{
-                                                borderRadius: 2,
-                                                background: '#25D366',
-                                                '&:hover': { background: '#128C7E' },
-                                                textTransform: 'none',
-                                                fontWeight: 600
-                                            }}
-                                        >
-                                            Kirim OTP ke WhatsApp
-                                        </Button>
-                                    </Box>
-                                ) : (
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-                                            Masukkan kode OTP yang dikirim ke <strong>{user?.phoneNumber}</strong> untuk mengonfirmasi perubahan password.
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Box sx={{
+                            p: 2.5,
+                            borderRadius: 2,
+                            bgcolor: c.cardBg,
+                            border: `1px solid ${c.cardBorder}`,
+                        }}>
+                            {!user?.isPhoneVerified ? (
+                                <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                                    Harap verifikasi nomor WhatsApp terlebih dahulu untuk dapat mengganti password.
+                                </Alert>
+                            ) : (
+                                <Box>
+                                    {pwOtpStep === 0 ? (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                             <TextField
                                                 size="small"
-                                                label="Kode OTP"
-                                                value={passwordOtp}
-                                                onChange={(e) => setPasswordOtp(e.target.value)}
+                                                label="Password Baru"
+                                                type={showPw ? 'text' : 'password'}
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
                                                 fullWidth
-                                                placeholder="6 digit"
-                                                disabled={changingPassword}
-                                                autoFocus
+                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                InputProps={{
+                                                    endAdornment: (
+                                                        <InputAdornment position="end">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => setShowPw(!showPw)}
+                                                                edge="end"
+                                                            >
+                                                                {showPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                                            </IconButton>
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                            />
+                                            <TextField
+                                                size="small"
+                                                label="Konfirmasi Password Baru"
+                                                type={showPw ? 'text' : 'password'}
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                fullWidth
                                                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                                             />
                                             <Button
                                                 variant="contained"
-                                                onClick={handleChangePassword}
-                                                disabled={changingPassword || !passwordOtp}
-                                                startIcon={changingPassword ? <CircularProgress size={16} /> : <SaveIcon />}
+                                                onClick={() => handleRequestOtp('password_change')}
+                                                disabled={requestingOtp || !newPassword || !confirmPassword}
+                                                startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
                                                 sx={{
                                                     borderRadius: 2,
-                                                    px: 3,
-                                                    background: c.btnGradient,
-                                                    '&:hover': { background: c.btnHoverGradient },
+                                                    background: '#25D366',
+                                                    '&:hover': { background: '#128C7E' },
                                                     textTransform: 'none',
-                                                    fontWeight: 600,
-                                                    whiteSpace: 'nowrap'
+                                                    fontWeight: 600
                                                 }}
                                             >
-                                                Ganti Password
+                                                Kirim OTP ke WhatsApp
                                             </Button>
                                         </Box>
-                                        <Button
-                                            size="small"
-                                            onClick={() => setPwOtpStep(0)}
-                                            sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', p: 0 }}
-                                        >
-                                            Batal
-                                        </Button>
-                                    </Box>
-                                )}
-                                <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: 'block' }}>
-                                    Penting: Penggantian password hanya diperbolehkan satu kali dalam 24 jam.
-                                </Typography>
-                            </Box>
-                        )}
-                    </Box>
-                </Box>
-
-                <Divider sx={{ mb: 3 }} />
-
-                {/* WhatsApp Section */}
-                <Box sx={{ mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                        <WhatsAppIcon sx={{ color: '#25D366', fontSize: 20 }} />
-                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
-                            WhatsApp Verification
-                        </Typography>
-                    </Box>
-
-                    <Box sx={{
-                        p: 2.5,
-                        borderRadius: 2,
-                        bgcolor: c.cardBg,
-                        border: `1px solid ${c.cardBorder}`,
-                    }}>
-                        {user?.isPhoneVerified ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Box sx={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: '50%',
-                                    bgcolor: 'success.main',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'white'
-                                }}>
-                                    <CheckIcon />
-                                </Box>
-                                <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                        {user.phoneNumber}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 500 }}>
-                                        Verified WhatsApp Number
+                                    ) : (
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                                                Masukkan kode OTP yang dikirim ke <strong>{user?.phoneNumber}</strong> untuk mengonfirmasi perubahan password.
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <TextField
+                                                    size="small"
+                                                    label="Kode OTP"
+                                                    value={passwordOtp}
+                                                    onChange={(e) => setPasswordOtp(e.target.value)}
+                                                    fullWidth
+                                                    placeholder="6 digit"
+                                                    disabled={changingPassword}
+                                                    autoFocus
+                                                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                />
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={handleChangePassword}
+                                                    disabled={changingPassword || !passwordOtp}
+                                                    startIcon={changingPassword ? <CircularProgress size={16} /> : <SaveIcon />}
+                                                    sx={{
+                                                        borderRadius: 2,
+                                                        px: 3,
+                                                        background: c.btnGradient,
+                                                        '&:hover': { background: c.btnHoverGradient },
+                                                        textTransform: 'none',
+                                                        fontWeight: 600,
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    Ganti Password
+                                                </Button>
+                                            </Box>
+                                            <Button
+                                                size="small"
+                                                onClick={() => setPwOtpStep(0)}
+                                                sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', p: 0 }}
+                                            >
+                                                Batal
+                                            </Button>
+                                        </Box>
+                                    )}
+                                    <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: 'block' }}>
+                                        Penting: Penggantian password hanya diperbolehkan satu kali dalam 24 jam.
                                     </Typography>
                                 </Box>
-                                <Button
-                                    size="small"
-                                    onClick={() => {
-                                        setOtpStep(0);
-                                        setPhoneNumber('');
-                                        // We don't have a direct "unverify" but we can let them change it
-                                    }}
-                                    sx={{ ml: 'auto', textTransform: 'none', fontSize: '0.75rem' }}
-                                >
-                                    Change
-                                </Button>
-                            </Box>
-                        ) : (
-                            <Box>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Verifikasi nomor WhatsApp Anda untuk menerima notifikasi penting.
-                                </Typography>
+                            )}
+                        </Box>
+                    </Box>
 
-                                {otpStep === 0 ? (
-                                    <Box sx={{ display: 'flex', gap: 1 }}>
-                                        <TextField
-                                            size="small"
-                                            label="Nomor WhatsApp"
-                                            value={phoneNumber}
-                                            onChange={(e) => setPhoneNumber(e.target.value)}
-                                            fullWidth
-                                            placeholder="Contoh: 08123456789"
-                                            disabled={requestingOtp}
-                                            sx={{
-                                                '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                                            }}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PhoneIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                        />
-                                        <Button
-                                            variant="contained"
-                                            onClick={handleRequestOtp}
-                                            disabled={requestingOtp || !phoneNumber.trim()}
-                                            startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
-                                            size="small"
-                                            sx={{
-                                                borderRadius: 2,
-                                                px: 2,
-                                                minHeight: 40,
-                                                background: '#25D366',
-                                                '&:hover': {
-                                                    background: '#128C7E',
-                                                },
-                                                textTransform: 'none',
-                                                fontWeight: 500,
-                                                whiteSpace: 'nowrap',
-                                            }}
-                                        >
-                                            Verifikasi
-                                        </Button>
+                    <Divider sx={{ mb: 3 }} />
+
+                    {/* WhatsApp Section */}
+                    <Box sx={{ mb: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <WhatsAppIcon sx={{ color: '#25D366', fontSize: 20 }} />
+                            <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                                WhatsApp Verification
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{
+                            p: 2.5,
+                            borderRadius: 2,
+                            bgcolor: c.cardBg,
+                            border: `1px solid ${c.cardBorder}`,
+                        }}>
+                            {user?.isPhoneVerified ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Box sx={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: '50%',
+                                        bgcolor: 'success.main',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: 'white'
+                                    }}>
+                                        <CheckIcon />
                                     </Box>
-                                ) : (
                                     <Box>
-                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-                                            Masukkan kode OTP yang dikirim ke <strong>{phoneNumber}</strong>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {user.phoneNumber}
                                         </Typography>
+                                        <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 500 }}>
+                                            Verified WhatsApp Number
+                                        </Typography>
+                                    </Box>
+                                    <Button
+                                        size="small"
+                                        onClick={() => {
+                                            setOtpStep(0);
+                                            setPhoneNumber('');
+                                            // We don't have a direct "unverify" but we can let them change it
+                                        }}
+                                        sx={{ ml: 'auto', textTransform: 'none', fontSize: '0.75rem' }}
+                                    >
+                                        Change
+                                    </Button>
+                                </Box>
+                            ) : (
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                        Verifikasi nomor WhatsApp Anda untuk menerima notifikasi penting.
+                                    </Typography>
+
+                                    {otpStep === 0 ? (
                                         <Box sx={{ display: 'flex', gap: 1 }}>
                                             <TextField
                                                 size="small"
-                                                label="Kode OTP"
-                                                value={otp}
-                                                onChange={(e) => setOtp(e.target.value)}
+                                                label="Nomor WhatsApp"
+                                                value={phoneNumber}
+                                                onChange={(e) => setPhoneNumber(e.target.value)}
                                                 fullWidth
-                                                placeholder="6 digit"
-                                                disabled={verifyingOtp}
-                                                autoFocus
+                                                placeholder="Contoh: 08123456789"
+                                                disabled={requestingOtp}
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                                                }}
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <PhoneIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                                                        </InputAdornment>
+                                                    ),
                                                 }}
                                             />
                                             <Button
                                                 variant="contained"
-                                                onClick={handleVerifyOtp}
-                                                disabled={verifyingOtp || !otp.trim()}
-                                                startIcon={verifyingOtp ? <CircularProgress size={16} /> : <CheckIcon />}
+                                                onClick={handleRequestOtp}
+                                                disabled={requestingOtp || !phoneNumber.trim()}
+                                                startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
                                                 size="small"
                                                 sx={{
                                                     borderRadius: 2,
                                                     px: 2,
                                                     minHeight: 40,
-                                                    background: c.btnGradient,
+                                                    background: '#25D366',
                                                     '&:hover': {
-                                                        background: c.btnHoverGradient,
+                                                        background: '#128C7E',
                                                     },
                                                     textTransform: 'none',
                                                     fontWeight: 500,
                                                     whiteSpace: 'nowrap',
                                                 }}
                                             >
-                                                Verify
+                                                Verifikasi
                                             </Button>
                                         </Box>
-                                        <Button
+                                    ) : (
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                                                Masukkan kode OTP yang dikirim ke <strong>{phoneNumber}</strong>
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <TextField
+                                                    size="small"
+                                                    label="Kode OTP"
+                                                    value={otp}
+                                                    onChange={(e) => setOtp(e.target.value)}
+                                                    fullWidth
+                                                    placeholder="6 digit"
+                                                    disabled={verifyingOtp}
+                                                    autoFocus
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                                                    }}
+                                                />
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={handleVerifyOtp}
+                                                    disabled={verifyingOtp || !otp.trim()}
+                                                    startIcon={verifyingOtp ? <CircularProgress size={16} /> : <CheckIcon />}
+                                                    size="small"
+                                                    sx={{
+                                                        borderRadius: 2,
+                                                        px: 2,
+                                                        minHeight: 40,
+                                                        background: c.btnGradient,
+                                                        '&:hover': {
+                                                            background: c.btnHoverGradient,
+                                                        },
+                                                        textTransform: 'none',
+                                                        fontWeight: 500,
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    Verify
+                                                </Button>
+                                            </Box>
+                                            <Button
+                                                size="small"
+                                                onClick={handleResetPhone}
+                                                sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', p: 0 }}
+                                            >
+                                                Ganti Nomor
+                                            </Button>
+                                        </Box>
+                                    )}
+                                </Box>
+                            )}
+                        </Box>
+                    </Box>
+
+                    <Divider sx={{ mb: 3 }} />
+
+                    {/* Email Alias Section */}
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <AliasIcon sx={{ color: c.accent, fontSize: 20 }} />
+                            <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                                Email Alias
+                            </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Add an alias email address. Emails sent to this alias will be delivered to your inbox.
+                            You can have maximum <strong>1 alias</strong>.
+                        </Typography>
+
+                        {/* Current Aliases */}
+                        {loading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                <CircularProgress size={28} sx={{ color: c.accent }} />
+                            </Box>
+                        ) : (
+                            <>
+                                {aliases.length > 0 && (
+                                    <Box sx={{ mb: 2 }}>
+                                        {aliases.map((alias) => (
+                                            <Box
+                                                key={alias.id}
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    p: 1.5,
+                                                    borderRadius: 2,
+                                                    bgcolor: c.aliasBg,
+                                                    border: `1px solid ${c.aliasBorder}`,
+                                                    mb: 1,
+                                                }}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <AliasIcon sx={{ color: c.accent, fontSize: 18 }} />
+                                                    <Box>
+                                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                            {alias.address}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.disabled">
+                                                            → {alias.goto}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Chip
+                                                        label={alias.active ? 'Active' : 'Inactive'}
+                                                        size="small"
+                                                        sx={{
+                                                            ml: 1,
+                                                            height: 20,
+                                                            fontSize: '0.6875rem',
+                                                            bgcolor: alias.active
+                                                                ? c.successBg
+                                                                : c.chipBg,
+                                                            color: alias.active ? 'success.main' : 'text.disabled',
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                    <Tooltip title={copied ? 'Copied!' : 'Copy alias'}>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleCopyAlias(alias.address)}
+                                                            sx={{ color: 'text.secondary' }}
+                                                        >
+                                                            {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Delete alias">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleDeleteAlias(alias.id)}
+                                                            disabled={deleting === alias.id}
+                                                            sx={{ color: 'error.main' }}
+                                                        >
+                                                            {deleting === alias.id
+                                                                ? <CircularProgress size={16} />
+                                                                : <DeleteIcon fontSize="small" />}
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Box>
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                )}
+
+                                {/* Add Alias Form - only show if no alias yet */}
+                                {aliases.length === 0 && (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        gap: 1,
+                                        alignItems: 'flex-start',
+                                    }}>
+                                        <TextField
                                             size="small"
-                                            onClick={handleResetPhone}
-                                            sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', p: 0 }}
+                                            value={newAlias}
+                                            onChange={(e) => setNewAlias(e.target.value.replace(/[@\s]/g, ''))}
+                                            onKeyPress={handleKeyPress}
+                                            placeholder="username"
+                                            disabled={adding}
+                                            sx={{
+                                                flex: 1,
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: 2,
+                                                },
+                                            }}
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{
+                                                                color: 'text.disabled',
+                                                                whiteSpace: 'nowrap',
+                                                                fontSize: '0.8rem',
+                                                                userSelect: 'none',
+                                                            }}
+                                                        >
+                                                            @{MAIL_DOMAIN}
+                                                        </Typography>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleAddAlias}
+                                            disabled={adding || !newAlias.trim()}
+                                            startIcon={adding ? <CircularProgress size={16} /> : <AddIcon />}
+                                            sx={{
+                                                borderRadius: 2,
+                                                px: 2.5,
+                                                minHeight: 40,
+                                                background: c.btnGradient,
+                                                '&:hover': {
+                                                    background: c.btnHoverGradient,
+                                                },
+                                                textTransform: 'none',
+                                                fontWeight: 500,
+                                            }}
                                         >
-                                            Ganti Nomor
+                                            Add
                                         </Button>
                                     </Box>
                                 )}
-                            </Box>
+
+                                {aliases.length === 0 && !loading && (
+                                    <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
+                                        No alias set. Add one above to receive emails on an alternative address.
+                                    </Typography>
+                                )}
+                            </>
                         )}
                     </Box>
-                </Box>
 
-                <Divider sx={{ mb: 3 }} />
+                    <Divider sx={{ my: 3 }} />
 
-                {/* Email Alias Section */}
-                <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                        <AliasIcon sx={{ color: c.accent, fontSize: 20 }} />
-                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
-                            Email Alias
-                        </Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Add an alias email address. Emails sent to this alias will be delivered to your inbox.
-                        You can have maximum <strong>1 alias</strong>.
-                    </Typography>
-
-                    {/* Current Aliases */}
-                    {loading ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                            <CircularProgress size={28} sx={{ color: c.accent }} />
+                    {/* Signature Section */}
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <SignatureIcon sx={{ color: c.accent, fontSize: 20 }} />
+                            <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                                Email Signature
+                            </Typography>
                         </Box>
-                    ) : (
-                        <>
-                            {aliases.length > 0 && (
-                                <Box sx={{ mb: 2 }}>
-                                    {aliases.map((alias) => (
-                                        <Box
-                                            key={alias.id}
-                                            sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                p: 1.5,
-                                                borderRadius: 2,
-                                                bgcolor: c.aliasBg,
-                                                border: `1px solid ${c.aliasBorder}`,
-                                                mb: 1,
-                                            }}
-                                        >
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <AliasIcon sx={{ color: c.accent, fontSize: 18 }} />
-                                                <Box>
-                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                                        {alias.address}
-                                                    </Typography>
-                                                    <Typography variant="caption" color="text.disabled">
-                                                        → {alias.goto}
-                                                    </Typography>
-                                                </Box>
-                                                <Chip
-                                                    label={alias.active ? 'Active' : 'Inactive'}
-                                                    size="small"
-                                                    sx={{
-                                                        ml: 1,
-                                                        height: 20,
-                                                        fontSize: '0.6875rem',
-                                                        bgcolor: alias.active
-                                                            ? c.successBg
-                                                            : c.chipBg,
-                                                        color: alias.active ? 'success.main' : 'text.disabled',
-                                                    }}
-                                                />
-                                            </Box>
-                                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                                <Tooltip title={copied ? 'Copied!' : 'Copy alias'}>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleCopyAlias(alias.address)}
-                                                        sx={{ color: 'text.secondary' }}
-                                                    >
-                                                        {copied ? <CheckIcon fontSize="small" /> : <CopyIcon fontSize="small" />}
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Delete alias">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleDeleteAlias(alias.id)}
-                                                        disabled={deleting === alias.id}
-                                                        sx={{ color: 'error.main' }}
-                                                    >
-                                                        {deleting === alias.id
-                                                            ? <CircularProgress size={16} />
-                                                            : <DeleteIcon fontSize="small" />}
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Box>
-                                        </Box>
-                                    ))}
-                                </Box>
-                            )}
-
-                            {/* Add Alias Form - only show if no alias yet */}
-                            {aliases.length === 0 && (
-                                <Box sx={{
-                                    display: 'flex',
-                                    gap: 1,
-                                    alignItems: 'flex-start',
-                                }}>
-                                    <TextField
-                                        size="small"
-                                        value={newAlias}
-                                        onChange={(e) => setNewAlias(e.target.value.replace(/[@\s]/g, ''))}
-                                        onKeyPress={handleKeyPress}
-                                        placeholder="username"
-                                        disabled={adding}
-                                        sx={{
-                                            flex: 1,
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: 2,
-                                            },
-                                        }}
-                                        InputProps={{
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <Typography
-                                                        variant="body2"
-                                                        sx={{
-                                                            color: 'text.disabled',
-                                                            whiteSpace: 'nowrap',
-                                                            fontSize: '0.8rem',
-                                                            userSelect: 'none',
-                                                        }}
-                                                    >
-                                                        @{MAIL_DOMAIN}
-                                                    </Typography>
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    />
-                                    <Button
-                                        variant="contained"
-                                        onClick={handleAddAlias}
-                                        disabled={adding || !newAlias.trim()}
-                                        startIcon={adding ? <CircularProgress size={16} /> : <AddIcon />}
-                                        sx={{
-                                            borderRadius: 2,
-                                            px: 2.5,
-                                            minHeight: 40,
-                                            background: c.btnGradient,
-                                            '&:hover': {
-                                                background: c.btnHoverGradient,
-                                            },
-                                            textTransform: 'none',
-                                            fontWeight: 500,
-                                        }}
-                                    >
-                                        Add
-                                    </Button>
-                                </Box>
-                            )}
-
-                            {aliases.length === 0 && !loading && (
-                                <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
-                                    No alias set. Add one above to receive emails on an alternative address.
-                                </Typography>
-                            )}
-                        </>
-                    )}
-                </Box>
-
-                <Divider sx={{ my: 3 }} />
-
-                {/* Signature Section */}
-                <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                        <SignatureIcon sx={{ color: c.accent, fontSize: 20 }} />
-                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
-                            Email Signature
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Create a signature that will be automatically added to your outgoing emails.
                         </Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Create a signature that will be automatically added to your outgoing emails.
-                    </Typography>
 
-                    <TextField
-                        multiline
-                        minRows={3}
-                        maxRows={6}
-                        fullWidth
-                        value={signature}
-                        onChange={(e) => setSignature(e.target.value)}
-                        placeholder="e.g. Best regards,&#10;John Doe&#10;SMK Bakti Nusantara 666"
-                        sx={{
-                            mb: 1.5,
-                            '& .MuiOutlinedInput-root': {
+                        <TextField
+                            multiline
+                            minRows={3}
+                            maxRows={6}
+                            fullWidth
+                            value={signature}
+                            onChange={(e) => setSignature(e.target.value)}
+                            placeholder="e.g. Best regards,&#10;John Doe&#10;SMK Bakti Nusantara 666"
+                            sx={{
+                                mb: 1.5,
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 2,
+                                    fontSize: '0.875rem',
+                                },
+                            }}
+                        />
+
+                        <Button
+                            variant="contained"
+                            onClick={handleSaveSignature}
+                            disabled={savingSignature}
+                            startIcon={savingSignature ? <CircularProgress size={16} /> : <SaveIcon />}
+                            size="small"
+                            sx={{
                                 borderRadius: 2,
-                                fontSize: '0.875rem',
-                            },
-                        }}
-                    />
+                                px: 2.5,
+                                background: c.btnGradient,
+                                '&:hover': {
+                                    background: c.btnHoverGradient,
+                                },
+                                textTransform: 'none',
+                                fontWeight: 500,
+                            }}
+                        >
+                            Save Signature
+                        </Button>
+                    </Box>
+                </DialogContent>
+            </Dialog>
 
-                    <Button
-                        variant="contained"
-                        onClick={handleSaveSignature}
-                        disabled={savingSignature}
-                        startIcon={savingSignature ? <CircularProgress size={16} /> : <SaveIcon />}
-                        size="small"
-                        sx={{
-                            borderRadius: 2,
-                            px: 2.5,
-                            background: c.btnGradient,
-                            '&:hover': {
-                                background: c.btnHoverGradient,
-                            },
-                            textTransform: 'none',
-                            fontWeight: 500,
-                        }}
-                    >
-                        Save Signature
-                    </Button>
-                </Box>
-            </DialogContent>
-        </Dialog>
+            <Snackbar
+                open={showSuccessToast}
+                autoHideDuration={4000}
+                onClose={() => setShowSuccessToast(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setShowSuccessToast(false)}
+                    severity="success"
+                    variant="filled"
+                    sx={{
+                        width: '100%',
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    }}
+                >
+                    {toastMessage}
+                </Alert>
+            </Snackbar>
+        </>
     );
 };
 
