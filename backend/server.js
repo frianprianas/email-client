@@ -20,6 +20,7 @@ const ImapService = require('./services/imapService');
 const scheduleRoutes = require('./routes/schedule');
 
 const ScheduledEmail = require('./models/ScheduledEmail');
+const VerificationOTP = require('./models/VerificationOTP');
 const SmtpService = require('./services/smtpService');
 
 // Define Model Associations

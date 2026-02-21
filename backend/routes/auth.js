@@ -3,6 +3,9 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const ImapService = require('../services/imapService');
 const authMiddleware = require('../middleware/auth');
+const VerificationOTP = require('../models/VerificationOTP');
+const fonnteService = require('../services/fonnteService');
+const { Op } = require('sequelize');
 
 const router = express.Router();
 
@@ -64,7 +67,9 @@ router.post('/login', async (req, res) => {
                 displayName: user.displayName,
                 avatar: user.avatar,
                 theme: user.theme,
-                signature: user.signature
+                signature: user.signature,
+                phoneNumber: user.phoneNumber,
+                isPhoneVerified: user.isPhoneVerified
             },
             token
         });
@@ -89,7 +94,9 @@ router.get('/me', authMiddleware, async (req, res) => {
             displayName: req.user.displayName,
             avatar: req.user.avatar,
             theme: req.user.theme,
-            signature: req.user.signature
+            signature: req.user.signature,
+            phoneNumber: req.user.phoneNumber,
+            isPhoneVerified: req.user.isPhoneVerified
         }
     });
 });
@@ -114,12 +121,92 @@ router.put('/profile', authMiddleware, async (req, res) => {
                 displayName: req.user.displayName,
                 avatar: req.user.avatar,
                 theme: req.user.theme,
-                signature: req.user.signature
+                signature: req.user.signature,
+                phoneNumber: req.user.phoneNumber,
+                isPhoneVerified: req.user.isPhoneVerified
             }
         });
     } catch (error) {
         console.error('Profile update error:', error);
         res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+// Request OTP for phone verification
+router.post('/request-otp', authMiddleware, async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        if (!phoneNumber) {
+            return res.status(400).json({ error: 'Nomor telepon diperlukan' });
+        }
+
+        // Generate 6 digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+        // Save OTP
+        await VerificationOTP.create({
+            phoneNumber,
+            otp,
+            expiresAt
+        });
+
+        // Send via Fonnte
+        await fonnteService.sendOTP(phoneNumber, otp);
+
+        res.json({ message: 'OTP telah dikirim ke WhatsApp Anda' });
+    } catch (error) {
+        console.error('Request OTP error:', error);
+        res.status(500).json({ error: error.message || 'Gagal mengirim OTP' });
+    }
+});
+
+// Verify OTP
+router.post('/verify-otp', authMiddleware, async (req, res) => {
+    try {
+        const { phoneNumber, otp } = req.body;
+        if (!phoneNumber || !otp) {
+            return res.status(400).json({ error: 'Nomor telepon dan OTP diperlukan' });
+        }
+
+        const record = await VerificationOTP.findOne({
+            where: {
+                phoneNumber,
+                otp,
+                expiresAt: { [Op.gt]: new Date() }
+            },
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!record) {
+            return res.status(400).json({ error: 'OTP tidak valid atau sudah kadaluarsa' });
+        }
+
+        // Update user
+        await req.user.update({
+            phoneNumber,
+            isPhoneVerified: true
+        });
+
+        // Delete OTP records for this number
+        await VerificationOTP.destroy({ where: { phoneNumber } });
+
+        res.json({
+            message: 'Nomor telepon berhasil diverifikasi',
+            user: {
+                id: req.user.id,
+                email: req.user.email,
+                displayName: req.user.displayName,
+                avatar: req.user.avatar,
+                theme: req.user.theme,
+                signature: req.user.signature,
+                phoneNumber: req.user.phoneNumber,
+                isPhoneVerified: req.user.isPhoneVerified
+            }
+        });
+    } catch (error) {
+        console.error('Verify OTP error:', error);
+        res.status(500).json({ error: 'Gagal memverifikasi OTP' });
     }
 });
 

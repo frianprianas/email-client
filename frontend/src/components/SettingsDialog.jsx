@@ -16,7 +16,9 @@ import {
     Person as PersonIcon,
     Edit as EditIcon,
     CameraAlt as CameraIcon,
-    RemoveCircle as RemoveIcon
+    RemoveCircle as RemoveIcon,
+    WhatsApp as WhatsAppIcon,
+    PhoneIphone as PhoneIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
@@ -46,14 +48,24 @@ const SettingsDialog = ({ open, onClose }) => {
     const [savingProfile, setSavingProfile] = useState(false);
     const avatarInputRef = useRef(null);
 
+    // Phone state
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [otp, setOtp] = useState('');
+    const [otpStep, setOtpStep] = useState(0); // 0: phone, 1: otp
+    const [requestingOtp, setRequestingOtp] = useState(false);
+    const [verifyingOtp, setVerifyingOtp] = useState(false);
+
     // Fetch aliases when dialog opens
     useEffect(() => {
         if (open) {
             fetchAliases();
             setSignature(user?.signature || '');
             setDisplayName(user?.displayName || '');
+            setPhoneNumber(user?.phoneNumber || '');
+            setOtpStep(0);
+            setOtp('');
         }
-    }, [open]);
+    }, [open, user]);
 
     const fetchAliases = async () => {
         setLoading(true);
@@ -227,6 +239,45 @@ const SettingsDialog = ({ open, onClose }) => {
         } finally {
             setSavingProfile(false);
         }
+    };
+
+    const handleRequestOtp = async () => {
+        if (!phoneNumber.trim()) return;
+        setRequestingOtp(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await authAPI.requestOtp(phoneNumber.trim());
+            setSuccess(res.data.message);
+            setOtpStep(1);
+        } catch (err) {
+            setError(err.response?.data?.error || 'Gagal mengirim OTP');
+        } finally {
+            setRequestingOtp(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (!otp.trim()) return;
+        setVerifyingOtp(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await authAPI.verifyOtp(phoneNumber.trim(), otp.trim());
+            updateUser(res.data.user);
+            setSuccess('Nomor WA berhasil diverifikasi!');
+            setOtpStep(0);
+            setOtp('');
+        } catch (err) {
+            setError(err.response?.data?.error || 'OTP tidak valid');
+        } finally {
+            setVerifyingOtp(false);
+        }
+    };
+
+    const handleResetPhone = () => {
+        setOtpStep(0);
+        setOtp('');
     };
 
     return (
@@ -418,6 +469,161 @@ const SettingsDialog = ({ open, onClose }) => {
                                 Save
                             </Button>
                         </Box>
+                    </Box>
+                </Box>
+
+                <Divider sx={{ mb: 3 }} />
+
+                {/* WhatsApp Section */}
+                <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                        <WhatsAppIcon sx={{ color: '#25D366', fontSize: 20 }} />
+                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                            WhatsApp Verification
+                        </Typography>
+                    </Box>
+
+                    <Box sx={{
+                        p: 2.5,
+                        borderRadius: 2,
+                        bgcolor: c.cardBg,
+                        border: `1px solid ${c.cardBorder}`,
+                    }}>
+                        {user?.isPhoneVerified ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Box sx={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: '50%',
+                                    bgcolor: 'success.main',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white'
+                                }}>
+                                    <CheckIcon />
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {user.phoneNumber}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 500 }}>
+                                        Verified WhatsApp Number
+                                    </Typography>
+                                </Box>
+                                <Button
+                                    size="small"
+                                    onClick={() => {
+                                        setOtpStep(0);
+                                        setPhoneNumber('');
+                                        // We don't have a direct "unverify" but we can let them change it
+                                    }}
+                                    sx={{ ml: 'auto', textTransform: 'none', fontSize: '0.75rem' }}
+                                >
+                                    Change
+                                </Button>
+                            </Box>
+                        ) : (
+                            <Box>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Verifikasi nomor WhatsApp Anda untuk menerima notifikasi penting.
+                                </Typography>
+
+                                {otpStep === 0 ? (
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <TextField
+                                            size="small"
+                                            label="Nomor WhatsApp"
+                                            value={phoneNumber}
+                                            onChange={(e) => setPhoneNumber(e.target.value)}
+                                            fullWidth
+                                            placeholder="Contoh: 08123456789"
+                                            disabled={requestingOtp}
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <PhoneIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleRequestOtp}
+                                            disabled={requestingOtp || !phoneNumber.trim()}
+                                            startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
+                                            size="small"
+                                            sx={{
+                                                borderRadius: 2,
+                                                px: 2,
+                                                minHeight: 40,
+                                                background: '#25D366',
+                                                '&:hover': {
+                                                    background: '#128C7E',
+                                                },
+                                                textTransform: 'none',
+                                                fontWeight: 500,
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            Verifikasi
+                                        </Button>
+                                    </Box>
+                                ) : (
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                                            Masukkan kode OTP yang dikirim ke <strong>{phoneNumber}</strong>
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <TextField
+                                                size="small"
+                                                label="Kode OTP"
+                                                value={otp}
+                                                onChange={(e) => setOtp(e.target.value)}
+                                                fullWidth
+                                                placeholder="6 digit"
+                                                disabled={verifyingOtp}
+                                                autoFocus
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                                                }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                onClick={handleVerifyOtp}
+                                                disabled={verifyingOtp || !otp.trim()}
+                                                startIcon={verifyingOtp ? <CircularProgress size={16} /> : <CheckIcon />}
+                                                size="small"
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    px: 2,
+                                                    minHeight: 40,
+                                                    background: c.btnGradient,
+                                                    '&:hover': {
+                                                        background: c.btnHoverGradient,
+                                                    },
+                                                    textTransform: 'none',
+                                                    fontWeight: 500,
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                Verify
+                                            </Button>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            onClick={handleResetPhone}
+                                            sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', p: 0 }}
+                                        >
+                                            Ganti Nomor
+                                        </Button>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
                     </Box>
                 </Box>
 
