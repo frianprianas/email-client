@@ -21,7 +21,8 @@ import {
     PhoneIphone as PhoneIcon,
     Lock as LockIcon,
     Visibility as VisibilityIcon,
-    VisibilityOff as VisibilityOffIcon
+    VisibilityOff as VisibilityOffIcon,
+    AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
@@ -67,6 +68,8 @@ const SettingsDialog = ({ open, onClose }) => {
     const [showPw, setShowPw] = useState(false);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
+    const [sessionDuration, setSessionDuration] = useState(7);
+    const [savingSession, setSavingSession] = useState(false);
 
     // Fetch aliases when dialog opens
     useEffect(() => {
@@ -81,6 +84,7 @@ const SettingsDialog = ({ open, onClose }) => {
             setNewPassword('');
             setConfirmPassword('');
             setPasswordOtp('');
+            setSessionDuration(user?.sessionDuration || 7);
         }
     }, [open, user]);
 
@@ -337,6 +341,21 @@ const SettingsDialog = ({ open, onClose }) => {
             setError(err.response?.data?.error || 'Gagal mengubah password');
         } finally {
             setChangingPassword(false);
+        }
+    };
+
+    const handleSaveSession = async () => {
+        setSavingSession(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await authAPI.updateProfile({ sessionDuration });
+            updateUser(res.data.user);
+            setSuccess('Session duration updated!');
+        } catch (err) {
+            setError('Failed to update session settings');
+        } finally {
+            setSavingSession(false);
         }
     };
 
@@ -809,6 +828,63 @@ const SettingsDialog = ({ open, onClose }) => {
                                     )}
                                 </Box>
                             )}
+                        </Box>
+                    </Box>
+
+                    <Divider sx={{ mb: 3 }} />
+
+                    {/* Session Section */}
+                    <Box sx={{ mb: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <AccessTimeIcon sx={{ color: c.accent, fontSize: 20 }} />
+                            <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                                Session Settings
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{
+                            p: 2.5,
+                            borderRadius: 2,
+                            bgcolor: c.cardBg,
+                            border: `1px solid ${c.cardBorder}`,
+                        }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                Atur berapa lama Anda tetap masuk (logged in) sebelum harus login kembali.
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                <TextField
+                                    select
+                                    size="small"
+                                    label="Durasi Sesi"
+                                    value={sessionDuration}
+                                    onChange={(e) => setSessionDuration(parseInt(e.target.value))}
+                                    sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                    SelectProps={{ native: true }}
+                                >
+                                    <option value={1}>1 Hari</option>
+                                    <option value={3}>3 Hari</option>
+                                    <option value={7}>7 Hari (Default)</option>
+                                    <option value={14}>14 Hari</option>
+                                    <option value={30}>30 Hari</option>
+                                </TextField>
+                                <Button
+                                    variant="contained"
+                                    onClick={handleSaveSession}
+                                    disabled={savingSession || sessionDuration === user?.sessionDuration}
+                                    startIcon={savingSession ? <CircularProgress size={16} /> : <SaveIcon />}
+                                    sx={{
+                                        borderRadius: 2,
+                                        px: 3,
+                                        background: c.btnGradient,
+                                        '&:hover': { background: c.btnHoverGradient },
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    Simpan Sesi
+                                </Button>
+                            </Box>
                         </Box>
                     </Box>
 

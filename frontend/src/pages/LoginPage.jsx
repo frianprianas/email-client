@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
     Box, Paper, TextField, Button, Typography, Alert,
     InputAdornment, IconButton, CircularProgress, Fade
@@ -9,7 +10,8 @@ import {
     Visibility,
     VisibilityOff,
     LightMode as LightModeIcon,
-    DarkMode as DarkModeIcon
+    DarkMode as DarkModeIcon,
+    HelpOutline as HelpIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../App';
@@ -254,16 +256,33 @@ const LoginPage = () => {
                         </Button>
                     </form>
 
+                    <Box sx={{ mt: 3, textAlign: 'center' }}>
+
+                        <Button
+                            startIcon={<HelpIcon sx={{ fontSize: 18 }} />}
+                            component={RouterLink}
+                            to="/help"
+                            sx={{
+                                color: 'primary.main',
+                                textTransform: 'none',
+                                fontSize: '0.875rem',
+                                '&:hover': { background: 'rgba(138,180,248,0.1)' }
+                            }}
+                        >
+                            Panduan Penggunaan
+                        </Button>
+                    </Box>
+
                     <Typography
                         variant="caption"
                         sx={{
                             display: 'block',
                             textAlign: 'center',
-                            mt: 3,
+                            mt: 2,
                             color: 'text.disabled',
                         }}
                     >
-                        Develoved by IT Support SMK Baknus 666
+                        Developed by IT Support SMK Baknus 666
                     </Typography>
                 </Paper>
             </Fade>

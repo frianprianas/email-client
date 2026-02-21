@@ -46,18 +46,22 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        // Calculate expiration based on user preference
+        const durationDays = user.sessionDuration || 7;
+        const expiresMs = durationDays * 24 * 60 * 60 * 1000;
+
         // Generate JWT
         const token = jwt.sign(
             { id: user.id, email: user.email },
             process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+            { expiresIn: `${durationDays}d` }
         );
 
         // Set cookie
         res.cookie('token', token, {
             httpOnly: true,
             secure: false,
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            maxAge: expiresMs,
             sameSite: 'lax'
         });
 
@@ -70,7 +74,8 @@ router.post('/login', async (req, res) => {
                 theme: user.theme,
                 signature: user.signature,
                 phoneNumber: user.phoneNumber,
-                isPhoneVerified: user.isPhoneVerified
+                isPhoneVerified: user.isPhoneVerified,
+                sessionDuration: user.sessionDuration
             },
             token
         });
@@ -97,7 +102,8 @@ router.get('/me', authMiddleware, async (req, res) => {
             theme: req.user.theme,
             signature: req.user.signature,
             phoneNumber: req.user.phoneNumber,
-            isPhoneVerified: req.user.isPhoneVerified
+            isPhoneVerified: req.user.isPhoneVerified,
+            sessionDuration: req.user.sessionDuration
         }
     });
 });
@@ -112,6 +118,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
         if (avatar !== undefined) updates.avatar = avatar;
         if (signature !== undefined) updates.signature = signature;
         if (theme !== undefined) updates.theme = theme;
+        if (req.body.sessionDuration !== undefined) updates.sessionDuration = req.body.sessionDuration;
 
         await req.user.update(updates);
 
@@ -124,7 +131,8 @@ router.put('/profile', authMiddleware, async (req, res) => {
                 theme: req.user.theme,
                 signature: req.user.signature,
                 phoneNumber: req.user.phoneNumber,
-                isPhoneVerified: req.user.isPhoneVerified
+                isPhoneVerified: req.user.isPhoneVerified,
+                sessionDuration: req.user.sessionDuration
             }
         });
     } catch (error) {
@@ -219,7 +227,8 @@ router.post('/verify-otp', authMiddleware, async (req, res) => {
                 theme: req.user.theme,
                 signature: req.user.signature,
                 phoneNumber: req.user.phoneNumber,
-                isPhoneVerified: req.user.isPhoneVerified
+                isPhoneVerified: req.user.isPhoneVerified,
+                sessionDuration: req.user.sessionDuration
             }
         });
     } catch (error) {

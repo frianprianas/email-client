@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import getTheme from './theme';
 import { authAPI } from './api';
 import LoginPage from './pages/LoginPage';
+import HelpPage from './pages/HelpPage';
 import MailLayout from './components/MailLayout';
 
 // Auth Context
@@ -100,6 +101,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/" />} />
+            <Route path="/help" element={<HelpPage />} />
             <Route path="/*" element={user ? <MailLayout /> : <Navigate to="/login" />} />
           </Routes>
         </BrowserRouter>

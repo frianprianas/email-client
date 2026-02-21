@@ -47,6 +47,10 @@ const User = sequelize.define('User', {
     lastPasswordChange: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    sessionDuration: {
+        type: DataTypes.INTEGER,
+        defaultValue: 7 // Default 7 days
     }
 }, {
     tableName: 'users',

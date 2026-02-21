@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import {
     Box, List, ListItemButton, ListItemIcon, ListItemText,
     Typography, Badge, Button, Divider, Tooltip, Avatar
@@ -15,7 +16,8 @@ import {
     Report as SpamIcon,
     AllInbox as AllMailIcon,
     Edit as ComposeIcon,
-    Folder as FolderIcon
+    Folder as FolderIcon,
+    HelpOutline as HelpIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../App';
@@ -203,6 +205,47 @@ const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDr
                             </ListItemButton>
                         );
                     })}
+
+                    <Divider sx={{ my: 1 }} />
+                    {miniDrawer ? (
+                        <Tooltip title="Tatacara Penggunaan" placement="right">
+                            <ListItemButton
+                                component={Link}
+                                to="/help"
+                                sx={{
+                                    justifyContent: 'center',
+                                    px: 2,
+                                    py: 1,
+                                    mx: 0.5,
+                                    borderRadius: '50%',
+                                    minHeight: 48,
+                                }}
+                            >
+                                <HelpIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                            </ListItemButton>
+                        </Tooltip>
+                    ) : (
+                        <ListItemButton
+                            component={Link}
+                            to="/help"
+                            sx={{
+                                py: 0.5,
+                                minHeight: 32,
+                                mr: 2,
+                            }}
+                        >
+                            <ListItemIcon sx={{ minWidth: 40 }}>
+                                <HelpIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                            </ListItemIcon>
+                            <ListItemText
+                                primary="Tatacara Penggunaan"
+                                primaryTypographyProps={{
+                                    fontSize: '0.8125rem',
+                                    color: 'text.primary',
+                                }}
+                            />
+                        </ListItemButton>
+                    )}
                 </List>
 
                 {/* User Profile Section (Bottom) */}
