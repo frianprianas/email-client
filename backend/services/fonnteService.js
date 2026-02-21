@@ -6,16 +6,22 @@ const FONNTE_TOKEN = process.env.FONNTE_TOKEN || 'KQ1XKbd2ZHue4cn9e7hc';
  * Send OTP via Fonnte WhatsApp API
  * @param {string} target - Phone number
  * @param {string} otp - OTP code
+ * @param {string} email - User email
+ * @param {string} type - Type of OTP (verification or password_change)
  * @returns {Promise<any>}
  */
-const sendOTP = async (target, otp) => {
+const sendOTP = async (target, otp, email, type = 'verification') => {
     try {
-        // Form data approach as per Fonnte documentation (often uses multipart or urlencoded)
-        // But axios handles JSON too if the API supports it. 
-        // Example PHP used simple array which usually maps to multipart/form-data or application/x-www-form-urlencoded
+        let message = '';
+        if (type === 'password_change') {
+            message = `Hallo pengguna email : ${email} ini kode OTP untuk mengganti password Anda: ${otp}. Berlaku selama 5 menit.`;
+        } else {
+            message = `Hallo pengguna email : ${email} ini kode OTP untuk menambahkan nomor WhatsApp Anda: ${otp}. Berlaku selama 5 menit.`;
+        }
+
         const formData = new URLSearchParams();
         formData.append('target', target);
-        formData.append('message', `Kode OTP BaknusMail Anda: ${otp}. Berlaku selama 5 menit.`);
+        formData.append('message', message);
         formData.append('countryCode', '62');
 
         const response = await axios.post('https://api.fonnte.com/send', formData, {

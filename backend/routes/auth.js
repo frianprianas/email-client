@@ -5,6 +5,7 @@ const ImapService = require('../services/imapService');
 const authMiddleware = require('../middleware/auth');
 const VerificationOTP = require('../models/VerificationOTP');
 const fonnteService = require('../services/fonnteService');
+const mailcowService = require('../services/mailcowService');
 const { Op } = require('sequelize');
 
 const router = express.Router();
@@ -132,12 +133,29 @@ router.put('/profile', authMiddleware, async (req, res) => {
     }
 });
 
-// Request OTP for phone verification
+// Request OTP for phone verification or password change
 router.post('/request-otp', authMiddleware, async (req, res) => {
     try {
-        const { phoneNumber } = req.body;
-        if (!phoneNumber) {
+        const { phoneNumber, type = 'verification' } = req.body;
+        const targetNumber = phoneNumber || req.user.phoneNumber;
+
+        if (!targetNumber) {
             return res.status(400).json({ error: 'Nomor telepon diperlukan' });
+        }
+
+        // If password change, ensure phone is verified first
+        if (type === 'password_change' && !req.user.isPhoneVerified) {
+            return res.status(400).json({ error: 'Harap verifikasi nomor WhatsApp terlebih dahulu' });
+        }
+
+        // Check daily limit for password change
+        if (type === 'password_change' && req.user.lastPasswordChange) {
+            const lastChange = new Date(req.user.lastPasswordChange);
+            const now = new Date();
+            const hoursDiff = (now - lastChange) / (1000 * 60 * 60);
+            if (hoursDiff < 24) {
+                return res.status(400).json({ error: 'Penggantian password hanya diperbolehkan satu kali dalam 24 jam' });
+            }
         }
 
         // Generate 6 digit OTP
@@ -146,13 +164,13 @@ router.post('/request-otp', authMiddleware, async (req, res) => {
 
         // Save OTP
         await VerificationOTP.create({
-            phoneNumber,
+            phoneNumber: targetNumber,
             otp,
             expiresAt
         });
 
-        // Send via Fonnte
-        await fonnteService.sendOTP(phoneNumber, otp);
+        // Send via Fonnte with personalized message
+        await fonnteService.sendOTP(targetNumber, otp, req.user.email, type);
 
         res.json({ message: 'OTP telah dikirim ke WhatsApp Anda' });
     } catch (error) {
@@ -207,6 +225,70 @@ router.post('/verify-otp', authMiddleware, async (req, res) => {
     } catch (error) {
         console.error('Verify OTP error:', error);
         res.status(500).json({ error: 'Gagal memverifikasi OTP' });
+    }
+});
+
+// Change Password
+router.post('/change-password', authMiddleware, async (req, res) => {
+    try {
+        const { newPassword, confirmPassword, otp } = req.body;
+
+        if (!newPassword || !confirmPassword || !otp) {
+            return res.status(400).json({ error: 'Semua field harus diisi' });
+        }
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ error: 'Konfirmasi password tidak cocok' });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'Password minimal 8 karakter' });
+        }
+
+        if (!req.user.isPhoneVerified || !req.user.phoneNumber) {
+            return res.status(400).json({ error: 'Harap verifikasi nomor WhatsApp terlebih dahulu' });
+        }
+
+        // Check daily limit again
+        if (req.user.lastPasswordChange) {
+            const lastChange = new Date(req.user.lastPasswordChange);
+            const now = new Date();
+            const hoursDiff = (now - lastChange) / (1000 * 60 * 60);
+            if (hoursDiff < 24) {
+                return res.status(400).json({ error: 'Penggantian password hanya diperbolehkan satu kali dalam 24 jam' });
+            }
+        }
+
+        // Verify OTP
+        const record = await VerificationOTP.findOne({
+            where: {
+                phoneNumber: req.user.phoneNumber,
+                otp,
+                expiresAt: { [Op.gt]: new Date() }
+            },
+            order: [['createdAt', 'DESC']]
+        });
+
+        if (!record) {
+            return res.status(400).json({ error: 'OTP tidak valid atau sudah kadaluarsa' });
+        }
+
+        // 1. Change password in Mailcow
+        await mailcowService.changePassword(req.user.email, newPassword);
+
+        // 2. Update local database
+        await req.user.update({
+            imapPassword: Buffer.from(newPassword).toString('base64'),
+            lastPasswordChange: new Date()
+        });
+
+        // 3. Delete OTP records
+        await VerificationOTP.destroy({ where: { phoneNumber: req.user.phoneNumber } });
+
+        res.json({ message: 'Password berhasil diubah' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: error.message || 'Gagal mengubah password' });
     }
 });
 

@@ -18,7 +18,10 @@ import {
     CameraAlt as CameraIcon,
     RemoveCircle as RemoveIcon,
     WhatsApp as WhatsAppIcon,
-    PhoneIphone as PhoneIcon
+    PhoneIphone as PhoneIcon,
+    Lock as LockIcon,
+    Visibility as VisibilityIcon,
+    VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
@@ -55,6 +58,14 @@ const SettingsDialog = ({ open, onClose }) => {
     const [requestingOtp, setRequestingOtp] = useState(false);
     const [verifyingOtp, setVerifyingOtp] = useState(false);
 
+    // Password change state
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordOtp, setPasswordOtp] = useState('');
+    const [pwOtpStep, setPwOtpStep] = useState(0); // 0: form, 1: otp
+    const [changingPassword, setChangingPassword] = useState(false);
+    const [showPw, setShowPw] = useState(false);
+
     // Fetch aliases when dialog opens
     useEffect(() => {
         if (open) {
@@ -64,6 +75,10 @@ const SettingsDialog = ({ open, onClose }) => {
             setPhoneNumber(user?.phoneNumber || '');
             setOtpStep(0);
             setOtp('');
+            setPwOtpStep(0);
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordOtp('');
         }
     }, [open, user]);
 
@@ -241,15 +256,21 @@ const SettingsDialog = ({ open, onClose }) => {
         }
     };
 
-    const handleRequestOtp = async () => {
-        if (!phoneNumber.trim()) return;
+    const handleRequestOtp = async (type = 'verification') => {
+        const target = type === 'verification' ? phoneNumber.trim() : user?.phoneNumber;
+        if (!target) return;
+
         setRequestingOtp(true);
         setError('');
         setSuccess('');
         try {
-            const res = await authAPI.requestOtp(phoneNumber.trim());
+            const res = await authAPI.requestOtp(target, type);
             setSuccess(res.data.message);
-            setOtpStep(1);
+            if (type === 'verification') {
+                setOtpStep(1);
+            } else {
+                setPwOtpStep(1);
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Gagal mengirim OTP');
         } finally {
@@ -278,6 +299,41 @@ const SettingsDialog = ({ open, onClose }) => {
     const handleResetPhone = () => {
         setOtpStep(0);
         setOtp('');
+    };
+
+    const handleChangePassword = async () => {
+        if (newPassword !== confirmPassword) {
+            setError('Konfirmasi password tidak cocok');
+            return;
+        }
+        if (newPassword.length < 8) {
+            setError('Password minimal 8 karakter');
+            return;
+        }
+        if (!passwordOtp) {
+            setError('Kode OTP harus diisi');
+            return;
+        }
+
+        setChangingPassword(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await authAPI.changePassword({
+                newPassword,
+                confirmPassword,
+                otp: passwordOtp
+            });
+            setSuccess(res.data.message);
+            setPwOtpStep(0);
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordOtp('');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Gagal mengubah password');
+        } finally {
+            setChangingPassword(false);
+        }
     };
 
     return (
@@ -469,6 +525,130 @@ const SettingsDialog = ({ open, onClose }) => {
                                 Save
                             </Button>
                         </Box>
+                    </Box>
+                </Box>
+
+                <Divider sx={{ mb: 3 }} />
+
+                {/* Password Change Section */}
+                <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                        <LockIcon sx={{ color: c.accent, fontSize: 20 }} />
+                        <Typography variant="subtitle2" sx={{ color: c.accent, fontWeight: 600 }}>
+                            Ganti Password Email
+                        </Typography>
+                    </Box>
+
+                    <Box sx={{
+                        p: 2.5,
+                        borderRadius: 2,
+                        bgcolor: c.cardBg,
+                        border: `1px solid ${c.cardBorder}`,
+                    }}>
+                        {!user?.isPhoneVerified ? (
+                            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                                Harap verifikasi nomor WhatsApp terlebih dahulu untuk dapat mengganti password.
+                            </Alert>
+                        ) : (
+                            <Box>
+                                {pwOtpStep === 0 ? (
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <TextField
+                                            size="small"
+                                            label="Password Baru"
+                                            type={showPw ? 'text' : 'password'}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            fullWidth
+                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => setShowPw(!showPw)}
+                                                            edge="end"
+                                                        >
+                                                            {showPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                        <TextField
+                                            size="small"
+                                            label="Konfirmasi Password Baru"
+                                            type={showPw ? 'text' : 'password'}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            fullWidth
+                                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            onClick={() => handleRequestOtp('password_change')}
+                                            disabled={requestingOtp || !newPassword || !confirmPassword}
+                                            startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
+                                            sx={{
+                                                borderRadius: 2,
+                                                background: '#25D366',
+                                                '&:hover': { background: '#128C7E' },
+                                                textTransform: 'none',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            Kirim OTP ke WhatsApp
+                                        </Button>
+                                    </Box>
+                                ) : (
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                                            Masukkan kode OTP yang dikirim ke <strong>{user?.phoneNumber}</strong> untuk mengonfirmasi perubahan password.
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <TextField
+                                                size="small"
+                                                label="Kode OTP"
+                                                value={passwordOtp}
+                                                onChange={(e) => setPasswordOtp(e.target.value)}
+                                                fullWidth
+                                                placeholder="6 digit"
+                                                disabled={changingPassword}
+                                                autoFocus
+                                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                onClick={handleChangePassword}
+                                                disabled={changingPassword || !passwordOtp}
+                                                startIcon={changingPassword ? <CircularProgress size={16} /> : <SaveIcon />}
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    px: 3,
+                                                    background: c.btnGradient,
+                                                    '&:hover': { background: c.btnHoverGradient },
+                                                    textTransform: 'none',
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                            >
+                                                Ganti Password
+                                            </Button>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            onClick={() => setPwOtpStep(0)}
+                                            sx={{ mt: 1, textTransform: 'none', fontSize: '0.75rem', p: 0 }}
+                                        >
+                                            Batal
+                                        </Button>
+                                    </Box>
+                                )}
+                                <Typography variant="caption" color="text.disabled" sx={{ mt: 1.5, display: 'block' }}>
+                                    Penting: Penggantian password hanya diperbolehkan satu kali dalam 24 jam.
+                                </Typography>
+                            </Box>
+                        )}
                     </Box>
                 </Box>
 

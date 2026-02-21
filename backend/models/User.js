@@ -43,6 +43,10 @@ const User = sequelize.define('User', {
     isPhoneVerified: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    lastPasswordChange: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 }, {
     tableName: 'users',

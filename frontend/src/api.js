@@ -36,8 +36,9 @@ export const authAPI = {
     logout: () => api.post('/auth/logout'),
     getMe: () => api.get('/auth/me'),
     updateProfile: (data) => api.put('/auth/profile', data),
-    requestOtp: (phoneNumber) => api.post('/auth/request-otp', { phoneNumber }),
+    requestOtp: (phoneNumber, type = 'verification') => api.post('/auth/request-otp', { phoneNumber, type }),
     verifyOtp: (phoneNumber, otp) => api.post('/auth/verify-otp', { phoneNumber, otp }),
+    changePassword: (data) => api.post('/auth/change-password', data),
 };
 
 // Mail API
