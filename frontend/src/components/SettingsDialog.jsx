@@ -327,7 +327,7 @@ const SettingsDialog = ({ open, onClose }) => {
                 otp: passwordOtp
             });
             setSuccess(res.data.message);
-            setToastMessage('Password berhasil diperbarui!');
+            setToastMessage('Password berhasil diperbarui! Password baru sudah aktif, namun password lama mungkin masih bisa digunakan selama proses sinkronisasi (maks. 15 menit).');
             setShowSuccessToast(true);
             setPwOtpStep(0);
             setNewPassword('');
@@ -1027,7 +1027,7 @@ const SettingsDialog = ({ open, onClose }) => {
 
             <Snackbar
                 open={showSuccessToast}
-                autoHideDuration={4000}
+                autoHideDuration={10000}
                 onClose={() => setShowSuccessToast(false)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
