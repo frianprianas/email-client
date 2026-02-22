@@ -301,4 +301,37 @@ router.post('/change-password', authMiddleware, async (req, res) => {
     }
 });
 
+// Render avatar directly as image
+router.get('/avatar/:email', async (req, res) => {
+    try {
+        const user = await User.findOne({ where: { email: req.params.email } });
+
+        if (!user || !user.avatar) {
+            // Jika avatar tidak ditemukan, tampilkan inisial email
+            return res.redirect(`https://ui-avatars.com/api/?name=${encodeURIComponent(req.params.email)}&background=random`);
+        }
+
+        // Memecah format data URI base64 (misal: "data:image/png;base64,iVBOR...")
+        const matches = user.avatar.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+
+        if (!matches || matches.length !== 3) {
+            return res.status(400).send('Format gambar tidak valid');
+        }
+
+        const imageType = matches[1]; // misal: image/png
+        const imageBuffer = Buffer.from(matches[2], 'base64');
+
+        // Set header HTTP
+        res.set('Content-Type', imageType);
+        res.set('Content-Length', imageBuffer.length);
+        res.set('Cache-Control', 'public, max-age=86400'); // Cache di memori browser selama 1 hari
+
+        // Kirim gambar
+        res.send(imageBuffer);
+    } catch (error) {
+        console.error('Error rendering avatar:', error);
+        res.status(500).send('Gagal menampilkan avatar');
+    }
+});
+
 module.exports = router;
