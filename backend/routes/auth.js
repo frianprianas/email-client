@@ -334,4 +334,29 @@ router.get('/avatar/:email', async (req, res) => {
     }
 });
 
+// Get basic profile info publicly (for other apps)
+router.get('/info/:email', async (req, res) => {
+    try {
+        const user = await User.findOne({
+            where: { email: req.params.email },
+            attributes: ['email', 'displayName', 'phoneNumber', 'isPhoneVerified']
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User tidak ditemukan' });
+        }
+
+        res.json({
+            email: user.email,
+            displayName: user.displayName,
+            phoneNumber: user.phoneNumber,
+            isPhoneVerified: user.isPhoneVerified,
+            avatarUrl: `https://baknusmail.smkbn666.sch.id/api/auth/avatar/${user.email}`
+        });
+    } catch (error) {
+        console.error('Error fetching public info:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
