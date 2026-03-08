@@ -16,6 +16,8 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../App';
 import logo from '../assets/logo.png';
+import background from '../assets/background.png';
+
 
 const MAIL_DOMAIN = 'smk.baktinusantara666.sch.id';
 
@@ -54,7 +56,9 @@ const LoginPage = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: c.loginBg,
+                background: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${background}) no-repeat center center`,
+                backgroundSize: 'cover',
+
                 position: 'relative',
                 overflow: 'hidden',
             }}
