@@ -22,8 +22,10 @@ import {
     TextSnippet as TemplateIcon,
     DeleteOutline as DeleteOutlineIcon,
     Schedule as ScheduleIcon,
-    ArrowDropDown as ArrowDropDownIcon
+    ArrowDropDown as ArrowDropDownIcon,
+    CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
+
 import { Menu, MenuItem, ListItemText, ListItemIcon, Popover, ButtonGroup } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { mailAPI, contactsAPI, templatesAPI, scheduleAPI } from '../api';
@@ -49,7 +51,10 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
     const [maximized, setMaximized] = useState(false);
     const [attachments, setAttachments] = useState([]);
     const [draftUid, setDraftUid] = useState(null);
+    const [driveGuidanceOpen, setDriveGuidanceOpen] = useState(false);
+    const [largeFileName, setLargeFileName] = useState('');
     const fileInputRef = useRef(null);
+
     const bodyRef = useRef(null);
     const bodyContentRef = useRef('');
 
@@ -317,21 +322,29 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
+        const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+
         files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const base64 = reader.result.split(',')[1];
-                setAttachments(prev => [...prev, {
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    base64
-                }]);
-            };
-            reader.readAsDataURL(file);
+            if (file.size > MAX_SIZE) {
+                setLargeFileName(file.name);
+                setDriveGuidanceOpen(true);
+            } else {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1];
+                    setAttachments(prev => [...prev, {
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        base64
+                    }]);
+                };
+                reader.readAsDataURL(file);
+            }
         });
         e.target.value = '';
     };
+
 
     const removeAttachment = (index) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
@@ -931,7 +944,73 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                 hidden
                 onChange={handleFileChange}
             />
+            {/* BaknusDrive Guidance Dialog */}
+            <Dialog 
+                open={driveGuidanceOpen} 
+                onClose={() => setDriveGuidanceOpen(false)}
+                PaperProps={{ 
+                    sx: { 
+                        borderRadius: 4, 
+                        p: 1, 
+                        maxWidth: 400,
+                        bgcolor: c.dialogBg,
+                        backgroundImage: 'none'
+                    } 
+                }}
+            >
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                    <Box sx={{ 
+                        mb: 2, 
+                        display: 'inline-flex', 
+                        p: 2, 
+                        borderRadius: '50%', 
+                        bgcolor: 'rgba(138, 180, 248, 0.1)' 
+                    }}>
+                        <CloudUploadIcon color="primary" sx={{ fontSize: 40 }} />
+                    </Box>
+                    <Typography variant="h6" fontWeight={700} gutterBottom>
+                        File Terlalu Besar
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.6 }}>
+                        File <strong>{largeFileName}</strong> melebihi batas lampiran 2 MB. 
+                        Silakan gunakan <strong>BaknusDrive</strong> untuk mengunggah file besar, lalu bagikan linknya.
+                    </Typography>
+                    
+                    <Box sx={{ p: 2, bgcolor: c.cardBg, borderRadius: 3, mb: 3, textAlign: 'left', border: `1px solid ${c.cardBorder}` }}>
+                        <Typography variant="caption" fontWeight={700} color="primary" sx={{ display: 'block', mb: 1, textTransform: 'uppercase' }}>
+                            Tips Berbagi di BaknusDrive:
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" component="div" sx={{ lineHeight: 1.5 }}>
+                            • Share secara <strong>Publik</strong> jika penerima di luar sekolah.<br/>
+                            • Share ke <strong>Akun Tertentu</strong> jika penerima warga sekolah.
+                        </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button 
+                            fullWidth 
+                            variant="outlined" 
+                            onClick={() => setDriveGuidanceOpen(false)}
+                            sx={{ borderRadius: 8, borderColor: c.borderLight }}
+                        >
+                            Tutup
+                        </Button>
+                        <Button 
+                            fullWidth 
+                            variant="contained" 
+                            onClick={() => {
+                                window.open('https://baknusdrive.smkbn666.sch.id', '_blank');
+                                setDriveGuidanceOpen(false);
+                            }}
+                            sx={{ borderRadius: 8, background: c.btnGradient }}
+                        >
+                            Buka Drive
+                        </Button>
+                    </Box>
+                </Box>
+            </Dialog>
         </Box>
+
     );
 
     return ReactDOM.createPortal(content, document.body);
