@@ -141,6 +141,41 @@ router.put('/profile', authMiddleware, async (req, res) => {
     }
 });
 
+// Fetch avatar from BaknusAttend
+router.post('/avatar/fetch-baknus', authMiddleware, async (req, res) => {
+    try {
+        const axios = require('axios');
+        const url = `https://baknusattend.smkbn666.sch.id/api/user/image?search=${encodeURIComponent(req.user.email)}`;
+        
+        const response = await axios.get(url);
+        const result = response.data;
+
+        if (result.status === 'SUCCESS' && result.data && result.data.base64) {
+            await req.user.update({ avatar: result.data.base64 });
+            
+            return res.json({
+                message: 'Avatar berhasil diambil dari BaknusAttend!',
+                user: {
+                    id: req.user.id,
+                    email: req.user.email,
+                    displayName: req.user.displayName,
+                    avatar: req.user.avatar,
+                    theme: req.user.theme,
+                    signature: req.user.signature,
+                    phoneNumber: req.user.phoneNumber,
+                    isPhoneVerified: req.user.isPhoneVerified,
+                    sessionDuration: req.user.sessionDuration
+                }
+            });
+        } else {
+            return res.status(404).json({ error: result.message || 'Foto tidak ditemukan di BaknusAttend' });
+        }
+    } catch (error) {
+        console.error('Error fetching BaknusAttend avatar:', error);
+        res.status(500).json({ error: 'Gagal mengambil foto dari BaknusAttend' });
+    }
+});
+
 // Request OTP for phone verification or password change
 router.post('/request-otp', authMiddleware, async (req, res) => {
     try {
@@ -308,7 +343,8 @@ router.get('/avatar/:email', async (req, res) => {
 
         if (!user || !user.avatar) {
             // Jika avatar tidak ditemukan, tampilkan inisial email
-            return res.redirect(`https://ui-avatars.com/api/?name=${encodeURIComponent(req.params.email)}&background=random`);
+            res.set('Access-Control-Allow-Origin', '*');
+            return res.redirect(`https://ui-avatars.com/api/?name=${encodeURIComponent(req.params.email)}&background=random&size=256`);
         }
 
         // Memecah format data URI base64 (misal: "data:image/png;base64,iVBOR...")
@@ -325,6 +361,7 @@ router.get('/avatar/:email', async (req, res) => {
         res.set('Content-Type', imageType);
         res.set('Content-Length', imageBuffer.length);
         res.set('Cache-Control', 'public, max-age=86400'); // Cache di memori browser selama 1 hari
+        res.set('Access-Control-Allow-Origin', '*');
 
         // Kirim gambar
         res.send(imageBuffer);
@@ -346,12 +383,16 @@ router.get('/info/:email', async (req, res) => {
             return res.status(404).json({ error: 'User tidak ditemukan' });
         }
 
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.get('host');
+        const baseUrl = `${protocol}://${host}`;
+
         res.json({
             email: user.email,
             displayName: user.displayName,
             phoneNumber: user.phoneNumber,
             isPhoneVerified: user.isPhoneVerified,
-            avatarUrl: `https://baknusmail.smkbn666.sch.id/api/auth/avatar/${user.email}`
+            avatarUrl: `${baseUrl}/api/public/avatar/${user.email}`
         });
     } catch (error) {
         console.error('Error fetching public info:', error);

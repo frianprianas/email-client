@@ -12,6 +12,7 @@ const folderRoutes = require('./routes/folders');
 const aliasRoutes = require('./routes/alias');
 const templateRoutes = require('./routes/templates');
 const snoozeRoutes = require('./routes/snooze');
+const publicRoutes = require('./routes/public');
 
 const SnoozedEmail = require('./models/SnoozedEmail');
 const User = require('./models/User');
@@ -32,6 +33,9 @@ ScheduledEmail.belongsTo(User, { foreignKey: 'userId' });
 
 const app = express();
 
+// Trust proxy for correct protocol/IP detection
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors({
   origin: true, // Allow all origins (for dev/docker flexibility)
@@ -50,6 +54,9 @@ app.use('/api/alias', aliasRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/snooze', snoozeRoutes);
 app.use('/api/schedule', scheduleRoutes);
+
+// Public API for other apps
+app.use('/api/public', publicRoutes);
 
 // ... (health check, error handler, snooze worker)
 

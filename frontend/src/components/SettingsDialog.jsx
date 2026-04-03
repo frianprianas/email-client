@@ -50,6 +50,7 @@ const SettingsDialog = ({ open, onClose }) => {
     // Profile state
     const [displayName, setDisplayName] = useState('');
     const [savingProfile, setSavingProfile] = useState(false);
+    const [fetchingBaknusAvatar, setFetchingBaknusAvatar] = useState(false);
     const avatarInputRef = useRef(null);
 
     // Phone state
@@ -259,6 +260,21 @@ const SettingsDialog = ({ open, onClose }) => {
             setError('Failed to remove avatar');
         } finally {
             setSavingProfile(false);
+        }
+    };
+    
+    const handleFetchBaknusAvatar = async () => {
+        setFetchingBaknusAvatar(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await authAPI.fetchBaknusAvatar();
+            updateUser(res.data.user);
+            setSuccess(res.data.message || 'Avatar berhasil diperbarui dari BaknusAttend!');
+        } catch (err) {
+            setError(err.response?.data?.error || 'Gagal mengambil foto dari BaknusAttend');
+        } finally {
+            setFetchingBaknusAvatar(false);
         }
     };
 
@@ -491,14 +507,30 @@ const SettingsDialog = ({ open, onClose }) => {
                                     <Typography variant="caption" color="text.disabled">
                                         Click avatar to upload photo (max 2MB)
                                     </Typography>
-                                    {user?.avatar && (
-                                        <Box>
+                                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                        <Button
+                                            size="small"
+                                            onClick={handleFetchBaknusAvatar}
+                                            disabled={fetchingBaknusAvatar}
+                                            startIcon={fetchingBaknusAvatar ? <CircularProgress size={12} /> : <CameraIcon sx={{ fontSize: 14 }} />}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                color: c.accent,
+                                                textTransform: 'none',
+                                                p: 0,
+                                                minWidth: 'auto',
+                                                '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                            }}
+                                        >
+                                            Ambil dari Absensi
+                                        </Button>
+                                        
+                                        {user?.avatar && (
                                             <Button
                                                 size="small"
                                                 onClick={handleRemoveAvatar}
                                                 startIcon={<RemoveIcon sx={{ fontSize: 14 }} />}
                                                 sx={{
-                                                    mt: 0.5,
                                                     fontSize: '0.7rem',
                                                     color: 'error.main',
                                                     textTransform: 'none',
@@ -509,8 +541,8 @@ const SettingsDialog = ({ open, onClose }) => {
                                             >
                                                 Remove photo
                                             </Button>
-                                        </Box>
-                                    )}
+                                        )}
+                                    </Box>
                                 </Box>
                             </Box>
 
