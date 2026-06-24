@@ -23,9 +23,9 @@ async function cartoonizeImage(base64Image, style = 'american') {
     }
 
     try {
-        console.log('[aiService] Menganalisa gambar dengan Gemini 1.5 Flash...');
+        console.log('[aiService] Menganalisa gambar dengan Gemini 3.5 Flash...');
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
         const prompt = "Describe the person in this image concisely for an image generation prompt. Include gender, hair color, eye color, skin tone, prominent facial features, and clothing. Keep it under 30 words.";
         
