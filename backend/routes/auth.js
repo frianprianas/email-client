@@ -422,8 +422,8 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             }
         }
 
-        // Proses gambar dengan Gemini dan Pollinations
-        const toonifiedBase64 = await aiService.cartoonizeImage(base64Avatar, style);
+        // Proses gambar dengan Anime API internal
+        const toonifiedBase64 = await aiService.cartoonizeImage(base64Avatar, req.user.id);
 
         // Hitung jumlah generasi hari ini
         const newCount = (req.user.lastAiGenerationDate === todayStr)
