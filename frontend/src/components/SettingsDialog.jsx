@@ -22,7 +22,8 @@ import {
     Lock as LockIcon,
     Visibility as VisibilityIcon,
     VisibilityOff as VisibilityOffIcon,
-    AccessTime as AccessTimeIcon
+    AccessTime as AccessTimeIcon,
+    AutoAwesome as AutoAwesomeIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
@@ -51,6 +52,7 @@ const SettingsDialog = ({ open, onClose }) => {
     const [displayName, setDisplayName] = useState('');
     const [savingProfile, setSavingProfile] = useState(false);
     const [fetchingBaknusAvatar, setFetchingBaknusAvatar] = useState(false);
+    const [cartoonizing, setCartoonizing] = useState(false);
     const avatarInputRef = useRef(null);
 
     // Phone state
@@ -278,6 +280,21 @@ const SettingsDialog = ({ open, onClose }) => {
         }
     };
 
+    const handleCartoonize = async (style) => {
+        setCartoonizing(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await authAPI.cartoonizeAvatar(style);
+            updateUser(res.data.user);
+            setSuccess(res.data.message || `Foto profil berhasil diubah ke gaya ${style === 'anime' ? 'Anime' : 'Kartun Pixar'}!`);
+        } catch (err) {
+            setError(err.response?.data?.error || `Gagal mengubah foto profil menggunakan AI`);
+        } finally {
+            setCartoonizing(false);
+        }
+    };
+
     const handleRequestOtp = async (type = 'verification') => {
         const target = type === 'verification' ? phoneNumber.trim() : user?.phoneNumber;
         if (!target) return;
@@ -455,12 +472,13 @@ const SettingsDialog = ({ open, onClose }) => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
                                 {/* Clickable Avatar */}
                                 <Box sx={{ position: 'relative' }}>
-                                    <input
+                                                                    <input
                                         type="file"
                                         accept="image/*"
                                         ref={avatarInputRef}
                                         onChange={handleAvatarUpload}
                                         style={{ display: 'none' }}
+                                        disabled={cartoonizing}
                                     />
                                     <Avatar
                                         src={user?.avatar || undefined}
@@ -470,35 +488,52 @@ const SettingsDialog = ({ open, onClose }) => {
                                             bgcolor: getAvatarColor(displayName || user?.email),
                                             fontSize: '1.5rem',
                                             fontWeight: 600,
-                                            cursor: 'pointer',
+                                            cursor: cartoonizing ? 'default' : 'pointer',
                                             transition: 'opacity 0.2s',
-                                            '&:hover': { opacity: 0.8 },
+                                            opacity: cartoonizing ? 0.5 : 1,
+                                            '&:hover': { opacity: cartoonizing ? 0.5 : 0.8 },
                                         }}
-                                        onClick={() => avatarInputRef.current?.click()}
+                                        onClick={() => !cartoonizing && avatarInputRef.current?.click()}
                                     >
                                         {getInitials(displayName || user?.email)}
                                     </Avatar>
+                                    {cartoonizing && (
+                                        <CircularProgress
+                                            size={40}
+                                            sx={{
+                                                position: 'absolute',
+                                                top: '50%',
+                                                left: '50%',
+                                                marginTop: '-20px',
+                                                marginLeft: '-20px',
+                                                color: c.accent,
+                                                zIndex: 2
+                                            }}
+                                        />
+                                    )}
                                     {/* Camera overlay */}
-                                    <Box
-                                        onClick={() => avatarInputRef.current?.click()}
-                                        sx={{
-                                            position: 'absolute',
-                                            bottom: -2,
-                                            right: -2,
-                                            width: 24,
-                                            height: 24,
-                                            borderRadius: '50%',
-                                            bgcolor: c.accent,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            cursor: 'pointer',
-                                            border: `2px solid ${c.cameraBtnBorder}`,
-                                            '&:hover': { opacity: 0.85 },
-                                        }}
-                                    >
-                                        <CameraIcon sx={{ fontSize: 14, color: c.avatarText }} />
-                                    </Box>
+                                    {!cartoonizing && (
+                                        <Box
+                                            onClick={() => avatarInputRef.current?.click()}
+                                            sx={{
+                                                position: 'absolute',
+                                                bottom: -2,
+                                                right: -2,
+                                                width: 24,
+                                                height: 24,
+                                                borderRadius: '50%',
+                                                bgcolor: c.accent,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                border: `2px solid ${c.cameraBtnBorder}`,
+                                                '&:hover': { opacity: 0.85 },
+                                            }}
+                                        >
+                                            <CameraIcon sx={{ fontSize: 14, color: c.avatarText }} />
+                                        </Box>
+                                    )}
                                 </Box>
                                 <Box sx={{ flex: 1 }}>
                                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
@@ -523,6 +558,40 @@ const SettingsDialog = ({ open, onClose }) => {
                                             }}
                                         >
                                             Ambil dari Absensi
+                                        </Button>
+
+                                        <Button
+                                            size="small"
+                                            onClick={() => handleCartoonize('cartoon')}
+                                            disabled={cartoonizing || fetchingBaknusAvatar}
+                                            startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                color: '#fdd663',
+                                                textTransform: 'none',
+                                                p: 0,
+                                                minWidth: 'auto',
+                                                '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                            }}
+                                        >
+                                            Kartun AI
+                                        </Button>
+
+                                        <Button
+                                            size="small"
+                                            onClick={() => handleCartoonize('anime')}
+                                            disabled={cartoonizing || fetchingBaknusAvatar}
+                                            startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#c58af9' }} />}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                color: '#c58af9',
+                                                textTransform: 'none',
+                                                p: 0,
+                                                minWidth: 'auto',
+                                                '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                            }}
+                                        >
+                                            Anime AI
                                         </Button>
                                         
                                         {user?.avatar && (

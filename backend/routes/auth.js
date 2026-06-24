@@ -7,6 +7,7 @@ const VerificationOTP = require('../models/VerificationOTP');
 const fonnteService = require('../services/fonnteService');
 const mailcowService = require('../services/mailcowService');
 const { Op } = require('sequelize');
+const aiService = require('../services/aiService');
 
 const router = express.Router();
 
@@ -397,6 +398,67 @@ router.get('/info/:email', async (req, res) => {
     } catch (error) {
         console.error('Error fetching public info:', error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Cartoonize profile avatar using Hugging Face AI
+router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
+    try {
+        const { style } = req.body;
+        if (!style || !['cartoon', 'anime'].includes(style)) {
+            return res.status(400).json({ error: 'Gaya (style) tidak valid. Harus cartoon atau anime.' });
+        }
+
+        let base64Avatar = req.user.avatar;
+
+        // Requirement 1: Only applies to users who already have a profile picture
+        if (!base64Avatar) {
+            return res.status(400).json({ error: 'Harap unggah foto profil terlebih dahulu sebelum menggunakan fitur kartunisasi AI.' });
+        }
+
+        // Requirement 3: Daily limit checks (max 2 times per day)
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        if (req.user.lastAiGenerationDate === todayStr) {
+            if (req.user.aiGenerationsToday >= 2) {
+                return res.status(400).json({ error: 'Batas harian tercapai. Anda hanya dapat menggunakan fitur AI ini maksimal 2 kali dalam sehari.' });
+            }
+        }
+
+        // Process the avatar image with AI
+        const cartoonizedBase64 = await aiService.cartoonizeImage(base64Avatar, style);
+
+        // Calculate new generation count
+        const newCount = (req.user.lastAiGenerationDate === todayStr)
+            ? (req.user.aiGenerationsToday + 1)
+            : 1;
+
+        // Save back to user profile and update AI counter
+        await req.user.update({
+            avatar: cartoonizedBase64,
+            aiGenerationsToday: newCount,
+            lastAiGenerationDate: todayStr
+        });
+
+        res.json({
+            message: `Foto profil berhasil diubah menjadi gaya ${style === 'anime' ? 'Anime' : 'Kartun Pixar'}!`,
+            user: {
+                id: req.user.id,
+                email: req.user.email,
+                displayName: req.user.displayName,
+                avatar: req.user.avatar,
+                theme: req.user.theme,
+                signature: req.user.signature,
+                phoneNumber: req.user.phoneNumber,
+                isPhoneVerified: req.user.isPhoneVerified,
+                sessionDuration: req.user.sessionDuration
+            }
+        });
+
+    } catch (error) {
+        console.error('Error cartoonizing avatar:', error);
+        res.status(500).json({ error: error.message || 'Gagal mengubah foto profil menggunakan AI.' });
     }
 });
 

@@ -51,6 +51,14 @@ const User = sequelize.define('User', {
     sessionDuration: {
         type: DataTypes.INTEGER,
         defaultValue: 7 // Default 7 days
+    },
+    aiGenerationsToday: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    lastAiGenerationDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
     }
 }, {
     tableName: 'users',

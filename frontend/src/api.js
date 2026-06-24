@@ -42,6 +42,7 @@ export const authAPI = {
     verifyOtp: (phoneNumber, otp) => api.post('/auth/verify-otp', { phoneNumber, otp }),
     changePassword: (data) => api.post('/auth/change-password', data),
     fetchBaknusAvatar: () => api.post('/auth/avatar/fetch-baknus'),
+    cartoonizeAvatar: (style) => api.post('/auth/avatar/cartoonize', { style }),
 };
 
 // Mail API
