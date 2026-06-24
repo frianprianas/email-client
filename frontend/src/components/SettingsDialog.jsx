@@ -280,12 +280,12 @@ const SettingsDialog = ({ open, onClose }) => {
         }
     };
 
-    const handleCartoonize = async () => {
+    const handleCartoonize = async (style) => {
         setCartoonizing(true);
         setError('');
         setSuccess('');
         try {
-            const res = await authAPI.cartoonizeAvatar();
+            const res = await authAPI.cartoonizeAvatar(style);
             updateUser(res.data.user);
             setSuccess(res.data.message || 'Foto profil berhasil diubah menjadi gaya Animasi Kartun!');
         } catch (err) {
@@ -562,7 +562,7 @@ const SettingsDialog = ({ open, onClose }) => {
 
                                         <Button
                                             size="small"
-                                            onClick={handleCartoonize}
+                                            onClick={() => handleCartoonize('american')}
                                             disabled={cartoonizing || fetchingBaknusAvatar}
                                             startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
                                             sx={{
@@ -574,7 +574,24 @@ const SettingsDialog = ({ open, onClose }) => {
                                                 '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
                                             }}
                                         >
-                                            {cartoonizing ? 'Memproses...' : 'Animasi AI'}
+                                            Kartun US
+                                        </Button>
+
+                                        <Button
+                                            size="small"
+                                            onClick={() => handleCartoonize('anime')}
+                                            disabled={cartoonizing || fetchingBaknusAvatar}
+                                            startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                color: '#fdd663',
+                                                textTransform: 'none',
+                                                p: 0,
+                                                minWidth: 'auto',
+                                                '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                            }}
+                                        >
+                                            Anime JP
                                         </Button>
                                         
                                         {user?.avatar && (

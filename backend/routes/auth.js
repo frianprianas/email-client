@@ -401,10 +401,11 @@ router.get('/info/:email', async (req, res) => {
     }
 });
 
-// Animasi profile avatar using DeepAI Toonify
+// Animasi profile avatar using Gemini 1.5 Flash
 router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
     try {
         let base64Avatar = req.user.avatar;
+        const { style } = req.body || {}; // 'american' or 'anime'
 
         // Hanya berlaku untuk user yang sudah memiliki foto profil
         if (!base64Avatar) {
@@ -421,8 +422,8 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             }
         }
 
-        // Proses gambar dengan DeepAI Toonify
-        const toonifiedBase64 = await aiService.cartoonizeImage(base64Avatar);
+        // Proses gambar dengan Gemini dan Pollinations
+        const toonifiedBase64 = await aiService.cartoonizeImage(base64Avatar, style);
 
         // Hitung jumlah generasi hari ini
         const newCount = (req.user.lastAiGenerationDate === todayStr)
