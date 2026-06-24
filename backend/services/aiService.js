@@ -4,29 +4,47 @@ const https = require('https');
 const HF_HOSTNAME = 'api-inference.huggingface.co';
 
 /**
- * Resolve a hostname to an IP address using Cloudflare DNS over HTTPS.
- * This bypasses standard DNS (UDP port 53) which may be blocked by Alibaba Cloud.
- * @param {string} hostname
- * @returns {Promise<string|null>} Resolved IP address or null if failed
+ * Resolve hostname via DNS over HTTPS using IP-based DoH endpoints
+ * (no DNS resolution needed for the DoH server itself).
+ * Tries Cloudflare (1.1.1.1) then Google (8.8.8.8).
  */
 async function resolveViaDoh(hostname) {
-    try {
-        const res = await axios.get(
-            `https://cloudflare-dns.com/dns-query?name=${hostname}&type=A`,
-            {
-                headers: { Accept: 'application/dns-json' },
+    const providers = [
+        {
+            // Cloudflare DoH via IP - tidak perlu DNS untuk resolve cloudflare
+            url: `https://1.1.1.1/dns-query?name=${hostname}&type=A`,
+            headers: { Accept: 'application/dns-json' },
+        },
+        {
+            // Google DoH via IP - tidak perlu DNS untuk resolve google
+            url: `https://8.8.8.8/resolve?name=${hostname}&type=A`,
+            headers: { Accept: 'application/dns-json' },
+        },
+    ];
+
+    for (const provider of providers) {
+        try {
+            console.log(`[aiService] Mencoba DoH ke: ${provider.url}`);
+            const res = await axios.get(provider.url, {
+                headers: provider.headers,
                 timeout: 8000,
+                // Izinkan self-signed/IP certificate (1.1.1.1 & 8.8.8.8 punya cert valid)
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            });
+            const answers = res.data && res.data.Answer;
+            if (Array.isArray(answers)) {
+                const aRecord = answers.find((a) => a.type === 1); // Type 1 = A record
+                if (aRecord && aRecord.data) {
+                    console.log(`[aiService] DoH berhasil: ${hostname} -> ${aRecord.data}`);
+                    return aRecord.data;
+                }
             }
-        );
-        const answers = res.data && res.data.Answer;
-        if (Array.isArray(answers)) {
-            // Type 1 = A record (IPv4)
-            const aRecord = answers.find((a) => a.type === 1);
-            if (aRecord) return aRecord.data;
+        } catch (err) {
+            console.warn(`[aiService] DoH ke ${provider.url} gagal:`, err.message);
         }
-    } catch (err) {
-        console.warn('[aiService] DoH resolve failed, akan coba langsung:', err.message);
     }
+
+    console.warn('[aiService] Semua DoH gagal, coba koneksi langsung...');
     return null;
 }
 
@@ -42,7 +60,7 @@ async function cartoonizeImage(base64Image, style) {
         throw new Error('HF_ACCESS_TOKEN belum dikonfigurasi di file .env backend.');
     }
 
-    // Clean base64 string
+    // Bersihkan string base64
     let rawBase64 = base64Image;
     if (base64Image.includes(';base64,')) {
         rawBase64 = base64Image.split(';base64,')[1];
@@ -59,20 +77,17 @@ async function cartoonizeImage(base64Image, style) {
         prompt = 'a 3D Disney Pixar style cartoon character, 3d render, cute animated movie character style, detailed, rich colors';
     }
 
-    // --- Resolusi DNS via DoH untuk bypass blokir DNS Alibaba Cloud ---
+    // Resolusi DNS lewat DoH (IP-based, tanpa butuh DNS)
     let requestUrl = `https://${HF_HOSTNAME}/models/${model}`;
     let httpsAgent = undefined;
 
     const resolvedIp = await resolveViaDoh(HF_HOSTNAME);
     if (resolvedIp) {
-        console.log(`[aiService] DNS DoH berhasil: ${HF_HOSTNAME} -> ${resolvedIp}`);
-        // Ganti hostname dengan IP langsung, tapi tetap kirim SNI yang benar agar SSL valid
+        // Sambungkan langsung ke IP, tapi kirim SNI yang benar agar SSL tetap valid
         requestUrl = `https://${resolvedIp}/models/${model}`;
         httpsAgent = new https.Agent({
-            servername: HF_HOSTNAME, // SNI: beritahu server SSL siapa kita
+            servername: HF_HOSTNAME,
         });
-    } else {
-        console.warn('[aiService] DoH gagal, mencoba koneksi langsung (mungkin DNS normal bekerja).');
     }
 
     try {
@@ -91,16 +106,14 @@ async function cartoonizeImage(base64Image, style) {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
-                    // Pastikan header Host dikirim dengan benar saat menggunakan IP langsung
                     Host: HF_HOSTNAME,
                 },
                 httpsAgent: httpsAgent,
                 responseType: 'arraybuffer',
-                timeout: 60000, // 60 detik
+                timeout: 60000,
             }
         );
 
-        // Jika response berupa JSON, berarti ada error dari API
         const contentType = response.headers['content-type'] || '';
         if (contentType.includes('application/json')) {
             const errorJson = JSON.parse(Buffer.from(response.data).toString('utf-8'));
@@ -129,7 +142,7 @@ async function cartoonizeImage(base64Image, style) {
                     throw new Error(errorJson.error);
                 }
             } catch (jsonErr) {
-                // Abaikan error parsing JSON, lempar error asli
+                // Abaikan error parsing, lempar error asli
             }
         }
 
