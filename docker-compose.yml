@@ -18,8 +18,9 @@ services:
   backend:
     build: ./backend
     restart: always
-    extra_hosts:
-      - "api-inference.huggingface.co:18.164.114.73"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       - PORT=5000
       - DB_HOST=db
