@@ -430,15 +430,15 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             ? (req.user.aiGenerationsToday + 1)
             : 1;
 
-        // Simpan avatar baru dan perbarui counter AI
+        // Perbarui counter AI saja, JANGAN simpan avatar
         await req.user.update({
-            avatar: toonifiedBase64,
             aiGenerationsToday: newCount,
             lastAiGenerationDate: todayStr
         });
 
         res.json({
-            message: `Foto profil berhasil diubah menjadi gaya Animasi Kartun! (${newCount}/2 hari ini)`,
+            message: `Preview foto profil animasi berhasil dibuat! (${newCount}/2 hari ini)`,
+            previewImage: toonifiedBase64,
             user: {
                 id: req.user.id,
                 email: req.user.email,
