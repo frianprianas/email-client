@@ -3,56 +3,83 @@ const https = require('https');
 
 const HF_HOSTNAME = 'api-inference.huggingface.co';
 
+// Agent yang mengizinkan koneksi ke IP langsung (1.1.1.1, 8.8.8.8)
+const dohAgent = new https.Agent({ rejectUnauthorized: false });
+
+const DOH_BASES = [
+    'https://1.1.1.1/dns-query',
+    'https://8.8.8.8/resolve',
+];
+
 /**
- * Resolve hostname via DNS over HTTPS using IP-based DoH endpoints
- * (no DNS resolution needed for the DoH server itself).
- * Tries Cloudflare (1.1.1.1) then Google (8.8.8.8).
+ * Query DNS over HTTPS untuk tipe record tertentu.
+ * @param {string} base - DoH base URL
+ * @param {string} name - Hostname yang dicari
+ * @param {string} type - Tipe record: 'A' atau 'CNAME'
+ * @returns {Promise<Array>} - Array DNS answer records
+ */
+async function queryDoh(base, name, type) {
+    const res = await axios.get(`${base}?name=${name}&type=${type}`, {
+        headers: { Accept: 'application/dns-json' },
+        timeout: 8000,
+        httpsAgent: dohAgent,
+    });
+    return (res.data && Array.isArray(res.data.Answer)) ? res.data.Answer : [];
+}
+
+/**
+ * Resolve hostname ke IP menggunakan DNS over HTTPS.
+ * Mendukung CNAME chaining agar tidak perlu A record langsung.
+ * @param {string} hostname
+ * @returns {Promise<string|null>} - IP address atau null
  */
 async function resolveViaDoh(hostname) {
-    const providers = [
-        {
-            // Cloudflare DoH via IP - tidak perlu DNS untuk resolve cloudflare
-            url: `https://1.1.1.1/dns-query?name=${hostname}&type=A`,
-            headers: { Accept: 'application/dns-json' },
-        },
-        {
-            // Google DoH via IP - tidak perlu DNS untuk resolve google
-            url: `https://8.8.8.8/resolve?name=${hostname}&type=A`,
-            headers: { Accept: 'application/dns-json' },
-        },
-    ];
-
-    for (const provider of providers) {
+    for (const base of DOH_BASES) {
         try {
-            console.log(`[aiService] Mencoba DoH ke: ${provider.url}`);
-            const res = await axios.get(provider.url, {
-                headers: provider.headers,
-                timeout: 8000,
-                // Izinkan self-signed/IP certificate (1.1.1.1 & 8.8.8.8 punya cert valid)
-                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-            });
-            const answers = res.data && res.data.Answer;
-            if (Array.isArray(answers)) {
-                const aRecord = answers.find((a) => a.type === 1); // Type 1 = A record
-                if (aRecord && aRecord.data) {
-                    console.log(`[aiService] DoH berhasil: ${hostname} -> ${aRecord.data}`);
-                    return aRecord.data;
+            console.log(`[aiService] DoH query A record: ${hostname} via ${base}`);
+
+            // 1. Coba A record langsung
+            let answers = await queryDoh(base, hostname, 'A');
+
+            // 2. Jika tidak ada A record, cari CNAME lalu resolve target-nya
+            const hasARecord = answers.some((a) => a.type === 1);
+            if (!hasARecord) {
+                console.log(`[aiService] Tidak ada A record langsung, cek CNAME...`);
+                const cnameAnswers = await queryDoh(base, hostname, 'CNAME');
+                const cnameRecord = cnameAnswers.find((a) => a.type === 5); // type 5 = CNAME
+
+                if (cnameRecord) {
+                    // Hapus trailing dot dari nama CNAME
+                    const cnameTarget = cnameRecord.data.replace(/\.$/, '');
+                    console.log(`[aiService] CNAME ditemukan: ${hostname} -> ${cnameTarget}`);
+
+                    // Resolve A record dari target CNAME
+                    answers = await queryDoh(base, cnameTarget, 'A');
                 }
             }
+
+            // 3. Ambil IP dari A record yang ditemukan
+            const aRecord = answers.find((a) => a.type === 1);
+            if (aRecord && aRecord.data) {
+                console.log(`[aiService] DoH berhasil: ${hostname} -> ${aRecord.data}`);
+                return aRecord.data;
+            }
+
+            console.warn(`[aiService] Tidak ada IP ditemukan dari ${base}`);
         } catch (err) {
-            console.warn(`[aiService] DoH ke ${provider.url} gagal:`, err.message);
+            console.warn(`[aiService] DoH gagal (${base}):`, err.message);
         }
     }
 
-    console.warn('[aiService] Semua DoH gagal, coba koneksi langsung...');
+    console.warn('[aiService] Semua DoH gagal.');
     return null;
 }
 
 /**
  * Cartoonize an image using Hugging Face Inference API.
  * @param {string} base64Image - Base64 image string (with or without data URI prefix)
- * @param {string} style - 'cartoon' or 'anime'
- * @returns {Promise<string>} Returns base64 image data URI of the cartoonized image
+ * @param {string} style - 'cartoon' atau 'anime'
+ * @returns {Promise<string>} - Base64 data URI gambar hasil cartoonize
  */
 async function cartoonizeImage(base64Image, style) {
     const token = process.env.HF_ACCESS_TOKEN;
@@ -77,13 +104,13 @@ async function cartoonizeImage(base64Image, style) {
         prompt = 'a 3D Disney Pixar style cartoon character, 3d render, cute animated movie character style, detailed, rich colors';
     }
 
-    // Resolusi DNS lewat DoH (IP-based, tanpa butuh DNS)
+    // Resolusi DNS via DoH - bypass blokir DNS Alibaba Cloud + handle CNAME chain
     let requestUrl = `https://${HF_HOSTNAME}/models/${model}`;
     let httpsAgent = undefined;
 
     const resolvedIp = await resolveViaDoh(HF_HOSTNAME);
     if (resolvedIp) {
-        // Sambungkan langsung ke IP, tapi kirim SNI yang benar agar SSL tetap valid
+        // Koneksi langsung ke IP dengan SNI yang benar agar SSL tetap valid
         requestUrl = `https://${resolvedIp}/models/${model}`;
         httpsAgent = new https.Agent({
             servername: HF_HOSTNAME,
