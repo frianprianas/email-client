@@ -280,16 +280,16 @@ const SettingsDialog = ({ open, onClose }) => {
         }
     };
 
-    const handleCartoonize = async (style) => {
+    const handleCartoonize = async () => {
         setCartoonizing(true);
         setError('');
         setSuccess('');
         try {
-            const res = await authAPI.cartoonizeAvatar(style);
+            const res = await authAPI.cartoonizeAvatar();
             updateUser(res.data.user);
-            setSuccess(res.data.message || `Foto profil berhasil diubah ke gaya ${style === 'anime' ? 'Anime' : 'Kartun Pixar'}!`);
+            setSuccess(res.data.message || 'Foto profil berhasil diubah menjadi gaya Animasi Kartun!');
         } catch (err) {
-            setError(err.response?.data?.error || `Gagal mengubah foto profil menggunakan AI`);
+            setError(err.response?.data?.error || 'Gagal mengubah foto profil menggunakan AI');
         } finally {
             setCartoonizing(false);
         }
@@ -562,7 +562,7 @@ const SettingsDialog = ({ open, onClose }) => {
 
                                         <Button
                                             size="small"
-                                            onClick={() => handleCartoonize('cartoon')}
+                                            onClick={handleCartoonize}
                                             disabled={cartoonizing || fetchingBaknusAvatar}
                                             startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
                                             sx={{
@@ -574,24 +574,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                                 '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
                                             }}
                                         >
-                                            Kartun AI
-                                        </Button>
-
-                                        <Button
-                                            size="small"
-                                            onClick={() => handleCartoonize('anime')}
-                                            disabled={cartoonizing || fetchingBaknusAvatar}
-                                            startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#c58af9' }} />}
-                                            sx={{
-                                                fontSize: '0.7rem',
-                                                color: '#c58af9',
-                                                textTransform: 'none',
-                                                p: 0,
-                                                minWidth: 'auto',
-                                                '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                            }}
-                                        >
-                                            Anime AI
+                                            {cartoonizing ? 'Memproses...' : 'Animasi AI'}
                                         </Button>
                                         
                                         {user?.avatar && (

@@ -36,7 +36,7 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - MAILCOW_API_URL=${MAILCOW_API_URL}
       - MAILCOW_API_KEY=${MAILCOW_API_KEY}
-      - HF_ACCESS_TOKEN=${HF_ACCESS_TOKEN}
+      - DEEPAI_API_KEY=${DEEPAI_API_KEY}
     depends_on:
       - db
     ports:
