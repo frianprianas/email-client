@@ -401,11 +401,10 @@ router.get('/info/:email', async (req, res) => {
     }
 });
 
-// Animasi profile avatar using Gemini 1.5 Flash
+// Animasi avatar - Step 1: Submit job ke Anime API, langsung return job_id
 router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
     try {
         let base64Avatar = req.user.avatar;
-        const { style } = req.body || {}; // 'american' or 'anime'
 
         // Hanya berlaku untuk user yang sudah memiliki foto profil
         if (!base64Avatar) {
@@ -422,39 +421,40 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             }
         }
 
-        // Proses gambar dengan Anime API internal
-        const toonifiedBase64 = await aiService.cartoonizeImage(base64Avatar, req.user.id);
+        // Submit ke Anime API, langsung dapat job_id tanpa menunggu
+        const jobId = await aiService.submitCartoonize(base64Avatar, req.user.id);
 
-        // Hitung jumlah generasi hari ini
+        // Hitung dan simpan counter
         const newCount = (req.user.lastAiGenerationDate === todayStr)
             ? (req.user.aiGenerationsToday + 1)
             : 1;
-
-        // Perbarui counter AI saja, JANGAN simpan avatar
         await req.user.update({
             aiGenerationsToday: newCount,
             lastAiGenerationDate: todayStr
         });
 
         res.json({
-            message: `Preview foto profil animasi berhasil dibuat! (${newCount}/2 hari ini)`,
-            previewImage: toonifiedBase64,
-            user: {
-                id: req.user.id,
-                email: req.user.email,
-                displayName: req.user.displayName,
-                avatar: req.user.avatar,
-                theme: req.user.theme,
-                signature: req.user.signature,
-                phoneNumber: req.user.phoneNumber,
-                isPhoneVerified: req.user.isPhoneVerified,
-                sessionDuration: req.user.sessionDuration
-            }
+            jobId,
+            message: `Animasi sedang diproses... (${newCount}/2 hari ini)`
         });
 
     } catch (error) {
-        console.error('Error animating avatar:', error);
-        res.status(500).json({ error: error.message || 'Gagal mengubah foto profil menggunakan AI.' });
+        console.error('Error submitting cartoonize job:', error);
+        res.status(500).json({ error: error.message || 'Gagal mengirim foto ke server animasi AI.' });
+    }
+});
+
+// Animasi avatar - Step 2: Cek status job (dipanggil berulang dari frontend)
+router.get('/avatar/cartoonize/status/:jobId', authMiddleware, async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const result = await aiService.getCartoonizeStatus(jobId);
+        res.json(result);
+    } catch (error) {
+        console.error('Error checking cartoonize status:', error);
+        // Kirim status error agar frontend bisa handle
+        const statusCode = error.response?.status === 429 ? 429 : 500;
+        res.status(statusCode).json({ error: error.message || 'Gagal mengecek status animasi.' });
     }
 });
 

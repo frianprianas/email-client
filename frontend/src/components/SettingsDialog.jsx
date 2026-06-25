@@ -286,12 +286,49 @@ const SettingsDialog = ({ open, onClose }) => {
         setError('');
         setSuccess('');
         try {
-            const res = await authAPI.cartoonizeAvatar();
-            setPreviewAvatar(res.data.previewImage);
-            setSuccess(res.data.message || 'Preview berhasil dibuat! Silakan terapkan jika Anda suka.');
+            // Step 1: Submit job, langsung dapat job_id
+            const submitRes = await authAPI.cartoonizeAvatar();
+            const jobId = submitRes.data.jobId;
+            setSuccess('Animasi sedang diproses di server, mohon tunggu...');
+
+            // Step 2: Polling status dari frontend setiap 5 detik
+            let attempts = 0;
+            const maxAttempts = 30; // Maks tunggu 2.5 menit
+            const poll = async () => {
+                if (attempts >= maxAttempts) {
+                    setError('Waktu habis. Server animasi mungkin sedang sibuk, coba lagi nanti.');
+                    setCartoonizing(false);
+                    return;
+                }
+                attempts++;
+                try {
+                    const statusRes = await authAPI.getCartoonizeStatus(jobId);
+                    const { status, imageDataUri } = statusRes.data;
+                    if (status === 'done' && imageDataUri) {
+                        setPreviewAvatar(imageDataUri);
+                        setSuccess('Preview berhasil dibuat! Silakan terapkan jika Anda suka.');
+                        setCartoonizing(false);
+                    } else if (status === 'failed' || status === 'error') {
+                        setError('Server gagal memproses gambar. Coba lagi.');
+                        setCartoonizing(false);
+                    } else {
+                        // Masih pending/processing, coba lagi 5 detik lagi
+                        setTimeout(poll, 5000);
+                    }
+                } catch (pollErr) {
+                    if (pollErr.response?.status === 429) {
+                        // Rate limited, coba lagi lebih lama
+                        setTimeout(poll, 8000);
+                    } else {
+                        setError(pollErr.response?.data?.error || 'Gagal mengecek status animasi.');
+                        setCartoonizing(false);
+                    }
+                }
+            };
+            setTimeout(poll, 5000); // mulai polling setelah 5 detik pertama
+
         } catch (err) {
-            setError(err.response?.data?.error || 'Gagal membuat preview foto profil menggunakan AI');
-        } finally {
+            setError(err.response?.data?.error || 'Gagal mengirim foto ke server animasi AI');
             setCartoonizing(false);
         }
     };

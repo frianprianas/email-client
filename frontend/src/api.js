@@ -43,6 +43,7 @@ export const authAPI = {
     changePassword: (data) => api.post('/auth/change-password', data),
     fetchBaknusAvatar: () => api.post('/auth/avatar/fetch-baknus'),
     cartoonizeAvatar: () => api.post('/auth/avatar/cartoonize'),
+    getCartoonizeStatus: (jobId) => api.get(`/auth/avatar/cartoonize/status/${jobId}`),
 };
 
 // Mail API
