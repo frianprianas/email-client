@@ -43,16 +43,25 @@ async function cartoonizeImage(base64Image, userId) {
         let imageUrl = '';
         
         while (status !== 'done') {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // tunggu 2 detik
+            await new Promise(resolve => setTimeout(resolve, 5000)); // tunggu 5 detik
             
-            const statusRes = await axios.get(`http://100.90.62.5:8001/status/${jobId}`);
-            status = statusRes.data.status;
-            
-            if (status === 'done') {
-                imageUrl = statusRes.data.image_url;
-                break;
-            } else if (status === 'failed' || status === 'error') {
-                throw new Error(`Status dari server: ${status}`);
+            try {
+                const statusRes = await axios.get(`http://100.90.62.5:8001/status/${jobId}`);
+                status = statusRes.data.status;
+                
+                if (status === 'done') {
+                    imageUrl = statusRes.data.image_url;
+                    break;
+                } else if (status === 'failed' || status === 'error') {
+                    throw new Error(`Status dari server: ${status}`);
+                }
+            } catch (pollErr) {
+                // Abaikan error 429 (Too Many Requests) akibat polling dan coba lagi di iterasi berikutnya
+                if (pollErr.response && pollErr.response.status === 429) {
+                    console.warn(`[aiService] Polling terlalu cepat (429 Too Many Requests), mencoba lagi...`);
+                } else {
+                    throw pollErr; // Jika error lain, lempar ke catch utama
+                }
             }
         }
 
