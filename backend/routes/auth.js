@@ -477,6 +477,35 @@ router.post('/avatar/cartoonize/image', authMiddleware, async (req, res) => {
         res.status(500).json({ error: error.message || 'Gagal mengunduh gambar hasil animasi.' });
     }
 });
+// Photo Validation - Step 1: Submit to Validation API
+router.post('/avatar/validate', authMiddleware, async (req, res) => {
+    try {
+        const { photo } = req.body;
+        if (!photo) {
+            return res.status(400).json({ error: 'Foto diperlukan' });
+        }
+        
+        const result = await aiService.submitValidation(photo, req.user.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Error submitting validation job:', error);
+        if (error.response?.status === 429) {
+            return res.status(429).json(error.response.data);
+        }
+        res.status(500).json({ error: error.message || 'Gagal mengirim foto ke server validasi.' });
+    }
+});
 
+// Photo Validation - Step 2: Check status
+router.get('/avatar/validate/status/:jobId', authMiddleware, async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const result = await aiService.getValidationStatus(jobId);
+        res.json(result);
+    } catch (error) {
+        console.error('Error checking validation status:', error);
+        res.status(500).json({ error: error.message || 'Gagal mengecek status validasi.' });
+    }
+});
 
 module.exports = router;

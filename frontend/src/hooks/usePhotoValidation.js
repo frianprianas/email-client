@@ -1,7 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import axios from 'axios';
-
-const VALIDATION_API_URL = 'http://100.90.62.5:8002';
+import api from '../api';
 
 export const usePhotoValidation = () => {
     const [isValidating, setIsValidating] = useState(false);
@@ -16,23 +14,22 @@ export const usePhotoValidation = () => {
         setValidationSuccess('');
         pollCountRef.current = 0;
 
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Step 1: Upload Foto
-                const formData = new FormData();
-                formData.append('user_id', userId);
-                formData.append('photo', file);
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+                try {
+                    const base64Photo = reader.result;
 
-                const response = await axios.post(`${VALIDATION_API_URL}/validate-photo`, formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
+                    // Step 1: Upload Foto via Backend Proxy
+                    const response = await api.post(`/auth/avatar/validate`, {
+                        photo: base64Photo
+                    });
+
+                    // Periksa jika server mengembalikan success: false
+                    if (!response.data || (!response.data.success && !response.data.job_id)) {
+                        throw new Error('Gagal mengirim foto untuk validasi.');
                     }
-                });
-
-                // Periksa jika server mengembalikan success: false
-                if (!response.data || (!response.data.success && !response.data.job_id)) {
-                    throw new Error('Gagal mengirim foto untuk validasi.');
-                }
 
                 const jobId = response.data.job_id;
 
@@ -48,7 +45,7 @@ export const usePhotoValidation = () => {
                             return;
                         }
 
-                        const statusRes = await axios.get(`${VALIDATION_API_URL}/validate-photo/${jobId}`);
+                        const statusRes = await api.get(`/auth/avatar/validate/status/${jobId}`);
                         const statusData = statusRes.data;
 
                         if (statusData.status === 'done') {
@@ -91,13 +88,15 @@ export const usePhotoValidation = () => {
 
             } catch (err) {
                 setIsValidating(false);
-                const msg = err.response?.status === 429 
-                    ? 'Batas penggunaan harian telah tercapai. Anda telah mencapai batas 5 validasi per hari.' 
-                    : 'Gagal mengirim foto ke server validasi.';
+                let msg = 'Gagal mengirim foto ke server validasi.';
+                if (err.response?.status === 429) {
+                    msg = err.response.data?.message || 'Batas penggunaan harian telah tercapai.';
+                }
                 setValidationError(msg);
                 reject(err);
             }
-        });
+        }; // end of reader.onloadend
+    }); // end of Promise
     }, []);
 
     // Cleanup on unmount

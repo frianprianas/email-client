@@ -3,6 +3,7 @@ const FormData = require('form-data');
 
 const ANIME_API_BASE = 'http://100.90.62.5:8001';
 const ANIME_API_KEY = 'RAHASIA_BAKNUSMAIL';
+const VALIDATION_API_BASE = 'http://100.90.62.5:8002';
 
 /**
  * Kirim gambar ke Anime API dan dapatkan job_id (tidak menunggu selesai)
@@ -77,8 +78,43 @@ async function downloadCartoonizeImage(imagePath) {
     return `data:${contentType};base64,${resultBase64}`;
 }
 
+/**
+ * Kirim gambar ke Validation API
+ */
+async function submitValidation(base64Image, userId) {
+    let rawBase64 = base64Image;
+    if (base64Image.includes(';base64,')) {
+        rawBase64 = base64Image.split(';base64,')[1];
+    }
+    const buffer = Buffer.from(rawBase64, 'base64');
+
+    const form = new FormData();
+    form.append('user_id', userId);
+    form.append('photo', buffer, { filename: 'validation.jpg', contentType: 'image/jpeg' });
+
+    console.log('[aiService] Mengirim gambar ke Validation API internal...');
+    const res = await axios.post(`${VALIDATION_API_BASE}/validate-photo`, form, {
+        headers: {
+            ...form.getHeaders()
+        }
+    });
+
+    return res.data;
+}
+
+/**
+ * Cek status job dari Validation API
+ */
+async function getValidationStatus(jobId) {
+    const res = await axios.get(`${VALIDATION_API_BASE}/validate-photo/${jobId}`);
+    return res.data;
+}
+
+
 module.exports = {
     submitCartoonize,
     getCartoonizeStatus,
     downloadCartoonizeImage,
+    submitValidation,
+    getValidationStatus,
 };
