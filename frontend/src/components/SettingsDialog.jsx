@@ -28,6 +28,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
 import { useAuth } from '../App';
+import { usePhotoValidation } from '../hooks/usePhotoValidation';
 
 const MAIL_DOMAIN = 'smk.baktinusantara666.sch.id';
 
@@ -75,6 +76,29 @@ const SettingsDialog = ({ open, onClose }) => {
     const [toastMessage, setToastMessage] = useState('');
     const [sessionDuration, setSessionDuration] = useState(7);
     const [savingSession, setSavingSession] = useState(false);
+
+    const {
+        isValidating,
+        validationError,
+        validationSuccess,
+        validatePhoto,
+        setValidationError,
+        setValidationSuccess
+    } = usePhotoValidation();
+
+    useEffect(() => {
+        if (validationError) {
+            setError(validationError);
+            setValidationError('');
+        }
+    }, [validationError, setValidationError]);
+
+    useEffect(() => {
+        if (validationSuccess) {
+            setSuccess(validationSuccess);
+            setValidationSuccess('');
+        }
+    }, [validationSuccess, setValidationSuccess]);
 
     // Fetch aliases when dialog opens
     useEffect(() => {
@@ -198,7 +222,7 @@ const SettingsDialog = ({ open, onClose }) => {
         return colors[index];
     };
 
-    const handleAvatarUpload = (e) => {
+    const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -209,6 +233,19 @@ const SettingsDialog = ({ open, onClose }) => {
         }
         if (file.size > 2 * 1024 * 1024) {
             setError('Image must be less than 2MB');
+            return;
+        }
+
+        setError('');
+        setSuccess('');
+        try {
+            const validationResult = await validatePhoto(file, user?.id || user?._id);
+            if (!validationResult.success) {
+                e.target.value = '';
+                return;
+            }
+        } catch (err) {
+            e.target.value = '';
             return;
         }
 
@@ -543,6 +580,23 @@ const SettingsDialog = ({ open, onClose }) => {
                     )}
 
                     {/* Progress polling indicator */}
+                    {isValidating && (
+                        <Box sx={{
+                            mb: 2,
+                            p: 1.5,
+                            borderRadius: 2,
+                            bgcolor: 'rgba(138,180,248,0.08)',
+                            border: '1px solid rgba(138,180,248,0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5
+                        }}>
+                            <CircularProgress size={16} sx={{ color: c.accent, flexShrink: 0 }} />
+                            <Typography variant="caption" sx={{ color: c.accent }}>
+                                Sedang memvalidasi foto profil dengan BaknusAI...
+                            </Typography>
+                        </Box>
+                    )}
                     {cartoonizing && pollCount > 0 && (
                         <Box sx={{
                             mb: 2,
@@ -587,7 +641,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                         ref={avatarInputRef}
                                         onChange={handleAvatarUpload}
                                         style={{ display: 'none' }}
-                                        disabled={cartoonizing || previewAvatar}
+                                        disabled={cartoonizing || previewAvatar || isValidating}
                                     />
                                     <Avatar
                                         src={previewAvatar || user?.avatar || undefined}
@@ -597,16 +651,16 @@ const SettingsDialog = ({ open, onClose }) => {
                                             bgcolor: getAvatarColor(displayName || user?.email),
                                             fontSize: '1.5rem',
                                             fontWeight: 600,
-                                            cursor: cartoonizing ? 'default' : 'pointer',
+                                            cursor: cartoonizing || isValidating ? 'default' : 'pointer',
                                             transition: 'opacity 0.2s',
-                                            opacity: cartoonizing ? 0.5 : 1,
-                                            '&:hover': { opacity: cartoonizing ? 0.5 : 0.8 },
+                                            opacity: cartoonizing || isValidating ? 0.5 : 1,
+                                            '&:hover': { opacity: cartoonizing || isValidating ? 0.5 : 0.8 },
                                         }}
-                                        onClick={() => !cartoonizing && avatarInputRef.current?.click()}
+                                        onClick={() => !cartoonizing && !isValidating && avatarInputRef.current?.click()}
                                     >
                                         {getInitials(displayName || user?.email)}
                                     </Avatar>
-                                    {cartoonizing && (
+                                    {(cartoonizing || isValidating) && (
                                         <CircularProgress
                                             size={40}
                                             sx={{
@@ -621,7 +675,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                         />
                                     )}
                                     {/* Camera overlay */}
-                                    {!cartoonizing && (
+                                    {!cartoonizing && !isValidating && (
                                         <Box
                                             onClick={() => avatarInputRef.current?.click()}
                                             sx={{
