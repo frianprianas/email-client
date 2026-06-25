@@ -44,6 +44,7 @@ export const authAPI = {
     fetchBaknusAvatar: () => api.post('/auth/avatar/fetch-baknus'),
     cartoonizeAvatar: () => api.post('/auth/avatar/cartoonize'),
     getCartoonizeStatus: (jobId) => api.get(`/auth/avatar/cartoonize/status/${jobId}`),
+    fetchCartoonizeImage: (imagePath) => api.post('/auth/avatar/cartoonize/image', { imagePath }),
 };
 
 // Mail API

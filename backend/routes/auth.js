@@ -452,9 +452,29 @@ router.get('/avatar/cartoonize/status/:jobId', authMiddleware, async (req, res) 
         res.json(result);
     } catch (error) {
         console.error('Error checking cartoonize status:', error);
-        // Kirim status error agar frontend bisa handle
-        const statusCode = error.response?.status === 429 ? 429 : 500;
-        res.status(statusCode).json({ error: error.message || 'Gagal mengecek status animasi.' });
+        // Jangan throw error - kembalikan status 'processing' agar frontend terus polling
+        if (error.response?.status === 429) {
+            return res.json({ status: 'processing', note: 'rate_limited' });
+        }
+        res.status(500).json({ error: error.message || 'Gagal mengecek status animasi.' });
+    }
+});
+
+// Animasi avatar - Step 3: Download & proxy gambar hasil animasi
+router.post('/avatar/cartoonize/image', authMiddleware, async (req, res) => {
+    try {
+        const { imagePath } = req.body;
+        if (!imagePath) {
+            return res.status(400).json({ error: 'imagePath diperlukan' });
+        }
+        const imageDataUri = await aiService.downloadCartoonizeImage(imagePath);
+        res.json({ imageDataUri });
+    } catch (error) {
+        console.error('Error downloading cartoonize image:', error);
+        if (error.response?.status === 429) {
+            return res.status(429).json({ error: 'Server gambar sedang sibuk, coba lagi sebentar.' });
+        }
+        res.status(500).json({ error: error.message || 'Gagal mengunduh gambar hasil animasi.' });
     }
 });
 

@@ -6,9 +6,6 @@ const ANIME_API_KEY = 'RAHASIA_BAKNUSMAIL';
 
 /**
  * Kirim gambar ke Anime API dan dapatkan job_id (tidak menunggu selesai)
- * @param {string} base64Image - Base64 image string
- * @param {string} userId - User ID
- * @returns {Promise<string>} - job_id
  */
 async function submitCartoonize(base64Image, userId) {
     let rawBase64 = base64Image;
@@ -39,34 +36,49 @@ async function submitCartoonize(base64Image, userId) {
 }
 
 /**
- * Cek status job dan kembalikan gambar jika sudah selesai
- * @param {string} jobId
- * @returns {Promise<{status: string, imageDataUri?: string}>}
+ * Cek status job - hanya kembalikan status & image_url, TIDAK download gambar
  */
 async function getCartoonizeStatus(jobId) {
     const statusRes = await axios.get(`${ANIME_API_BASE}/status/${jobId}`);
-    const status = statusRes.data.status;
+    const data = statusRes.data;
+    console.log(`[aiService] Status job ${jobId}:`, JSON.stringify(data));
 
-    if (status === 'done') {
-        const imageUrl = statusRes.data.image_url;
-        console.log(`[aiService] Job ${jobId} selesai! Mengunduh gambar dari ${imageUrl}...`);
+    const status = data.status;
 
-        const imageRes = await axios.get(`${ANIME_API_BASE}${imageUrl}`, {
-            responseType: 'arraybuffer'
-        });
-
-        const resultBase64 = Buffer.from(imageRes.data).toString('base64');
-        const contentType = imageRes.headers['content-type'] || 'image/jpeg';
+    if (status === 'done' || status === 'completed' || status === 'finished') {
+        // Kembalikan path gambar agar bisa di-proxy terpisah
         return {
             status: 'done',
-            imageDataUri: `data:${contentType};base64,${resultBase64}`
+            imagePath: data.image_url || data.output || data.result || null
         };
     }
 
-    return { status };
+    if (status === 'failed' || status === 'error') {
+        return { status: 'error' };
+    }
+
+    // Masih pending/processing
+    return { status: status || 'processing' };
+}
+
+/**
+ * Download gambar dari Anime API dan kembalikan sebagai base64 data URI
+ * (dipisahkan agar bisa di-retry mandiri)
+ */
+async function downloadCartoonizeImage(imagePath) {
+    console.log(`[aiService] Mengunduh gambar dari ${ANIME_API_BASE}${imagePath}...`);
+    const imageRes = await axios.get(`${ANIME_API_BASE}${imagePath}`, {
+        responseType: 'arraybuffer',
+        timeout: 30000
+    });
+
+    const resultBase64 = Buffer.from(imageRes.data).toString('base64');
+    const contentType = imageRes.headers['content-type'] || 'image/jpeg';
+    return `data:${contentType};base64,${resultBase64}`;
 }
 
 module.exports = {
     submitCartoonize,
     getCartoonizeStatus,
+    downloadCartoonizeImage,
 };

@@ -54,6 +54,7 @@ const SettingsDialog = ({ open, onClose }) => {
     const [fetchingBaknusAvatar, setFetchingBaknusAvatar] = useState(false);
     const [cartoonizing, setCartoonizing] = useState(false);
     const [previewAvatar, setPreviewAvatar] = useState(null);
+    const [pollCount, setPollCount] = useState(0);
     const avatarInputRef = useRef(null);
 
     // Phone state
@@ -283,51 +284,79 @@ const SettingsDialog = ({ open, onClose }) => {
 
     const handleCartoonize = async () => {
         setCartoonizing(true);
+        setPollCount(0);
         setError('');
         setSuccess('');
         try {
-            // Step 1: Submit job, langsung dapat job_id
+            // Step 1: Submit job ke backend, langsung dapat job_id
             const submitRes = await authAPI.cartoonizeAvatar();
             const jobId = submitRes.data.jobId;
-            setSuccess('Animasi sedang diproses di server, mohon tunggu...');
 
-            // Step 2: Polling status dari frontend setiap 5 detik
+            if (!jobId) {
+                throw new Error('Tidak menerima job ID dari server.');
+            }
+
+            // Step 2: Polling status setiap 5 detik
             let attempts = 0;
-            const maxAttempts = 30; // Maks tunggu 2.5 menit
+            const maxAttempts = 36; // Maks 3 menit
+
             const poll = async () => {
                 if (attempts >= maxAttempts) {
-                    setError('Waktu habis. Server animasi mungkin sedang sibuk, coba lagi nanti.');
+                    setError('Waktu tunggu habis. Server animasi mungkin sedang sibuk, coba lagi nanti.');
                     setCartoonizing(false);
                     return;
                 }
                 attempts++;
+                setPollCount(attempts);
+
+                let statusData;
                 try {
                     const statusRes = await authAPI.getCartoonizeStatus(jobId);
-                    const { status, imageDataUri } = statusRes.data;
-                    if (status === 'done' && imageDataUri) {
-                        setPreviewAvatar(imageDataUri);
-                        setSuccess('Preview berhasil dibuat! Silakan terapkan jika Anda suka.');
-                        setCartoonizing(false);
-                    } else if (status === 'failed' || status === 'error') {
-                        setError('Server gagal memproses gambar. Coba lagi.');
-                        setCartoonizing(false);
-                    } else {
-                        // Masih pending/processing, coba lagi 5 detik lagi
-                        setTimeout(poll, 5000);
-                    }
+                    statusData = statusRes.data;
+                    console.log('[poll] Status response:', statusData);
                 } catch (pollErr) {
-                    if (pollErr.response?.status === 429) {
-                        // Rate limited, coba lagi lebih lama
-                        setTimeout(poll, 8000);
-                    } else {
-                        setError(pollErr.response?.data?.error || 'Gagal mengecek status animasi.');
-                        setCartoonizing(false);
-                    }
+                    console.warn('[poll] Error mengecek status, coba lagi...', pollErr.message);
+                    setTimeout(poll, 6000);
+                    return;
+                }
+
+                const { status, imagePath } = statusData;
+
+                if (status === 'error' || status === 'failed') {
+                    setError('Server gagal memproses gambar. Silakan coba lagi.');
+                    setCartoonizing(false);
+                    return;
+                }
+
+                if (status === 'done' && imagePath) {
+                    // Step 3: Download gambar via proxy backend (dengan retry)
+                    const downloadWithRetry = async (retries = 5, delay = 4000) => {
+                        try {
+                            const imgRes = await authAPI.fetchCartoonizeImage(imagePath);
+                            setPreviewAvatar(imgRes.data.imageDataUri);
+                            setSuccess('Preview berhasil dibuat! Silakan terapkan jika Anda suka.');
+                            setCartoonizing(false);
+                        } catch (dlErr) {
+                            console.warn('[download] Gagal download gambar:', dlErr.message);
+                            if (retries > 0) {
+                                setTimeout(() => downloadWithRetry(retries - 1, delay + 2000), delay);
+                            } else {
+                                setError('Gagal mengunduh gambar hasil animasi. Coba lagi.');
+                                setCartoonizing(false);
+                            }
+                        }
+                    };
+                    downloadWithRetry();
+                } else {
+                    // Masih processing
+                    setTimeout(poll, 5000);
                 }
             };
+
             setTimeout(poll, 5000); // mulai polling setelah 5 detik pertama
 
         } catch (err) {
+            console.error('[cartoonize] Error submit:', err);
             setError(err.response?.data?.error || 'Gagal mengirim foto ke server animasi AI');
             setCartoonizing(false);
         }
@@ -512,6 +541,26 @@ const SettingsDialog = ({ open, onClose }) => {
                             {success}
                         </Alert>
                     )}
+
+                    {/* Progress polling indicator */}
+                    {cartoonizing && pollCount > 0 && (
+                        <Box sx={{
+                            mb: 2,
+                            p: 1.5,
+                            borderRadius: 2,
+                            bgcolor: 'rgba(138,180,248,0.08)',
+                            border: '1px solid rgba(138,180,248,0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5
+                        }}>
+                            <CircularProgress size={16} sx={{ color: c.accent, flexShrink: 0 }} />
+                            <Typography variant="caption" sx={{ color: c.accent }}>
+                                Menunggu hasil animasi... (cek ke-{pollCount}/36)
+                            </Typography>
+                        </Box>
+                    )}
+
 
                     {/* Profile Section */}
                     <Box sx={{ mb: 3 }}>
