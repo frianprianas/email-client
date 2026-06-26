@@ -20,6 +20,8 @@ export const usePhotoValidation = () => {
             reader.onloadend = async () => {
                 try {
                     const base64Photo = reader.result;
+                    
+                    console.log('[usePhotoValidation] Mengirim foto ke proxy backend...');
 
                     // Step 1: Upload Foto via Backend Proxy
                     const response = await api.post(`/auth/avatar/validate`, {
