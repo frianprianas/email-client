@@ -32,6 +32,72 @@ import { usePhotoValidation } from '../hooks/usePhotoValidation';
 
 const MAIL_DOMAIN = 'smk.baktinusantara666.sch.id';
 
+const processImageOnTheFly = (file) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                // 1. Generate 1024px compressed file for validation
+                const valCanvas = document.createElement('canvas');
+                let valWidth = img.width;
+                let valHeight = img.height;
+                const maxValDim = 1024;
+
+                if (valWidth > valHeight) {
+                    if (valWidth > maxValDim) {
+                        valHeight = Math.round((valHeight * maxValDim) / valWidth);
+                        valWidth = maxValDim;
+                    }
+                } else {
+                    if (valHeight > maxValDim) {
+                        valWidth = Math.round((valWidth * maxValDim) / valHeight);
+                        valHeight = maxValDim;
+                    }
+                }
+
+                valCanvas.width = valWidth;
+                valCanvas.height = valHeight;
+                const valCtx = valCanvas.getContext('2d');
+                valCtx.drawImage(img, 0, 0, valWidth, valHeight);
+
+                // 2. Generate 128x128 cropped base64 for profile avatar
+                const avCanvas = document.createElement('canvas');
+                const avSize = 128;
+                avCanvas.width = avSize;
+                avCanvas.height = avSize;
+                const avCtx = avCanvas.getContext('2d');
+
+                const minDim = Math.min(img.width, img.height);
+                const sx = (img.width - minDim) / 2;
+                const sy = (img.height - minDim) / 2;
+                avCtx.drawImage(img, sx, sy, minDim, minDim, 0, 0, avSize, avSize);
+                const avatarBase64 = avCanvas.toDataURL('image/jpeg', 0.85);
+
+                valCanvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            reject(new Error('Image processing failed'));
+                            return;
+                        }
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve({ compressedFile, avatarBase64 });
+                    },
+                    'image/jpeg',
+                    0.8
+                );
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+};
+
 const SettingsDialog = ({ open, onClose }) => {
     const { user, updateUser } = useAuth();
     const theme = useTheme();
@@ -226,67 +292,39 @@ const SettingsDialog = ({ open, onClose }) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file
+        // Validate file type
         if (!file.type.startsWith('image/')) {
             setError('Please select an image file');
-            return;
-        }
-        if (file.size > 2 * 1024 * 1024) {
-            setError('Image must be less than 2MB');
             return;
         }
 
         setError('');
         setSuccess('');
+        setSavingProfile(true);
+
         try {
-            const validationResult = await validatePhoto(file, user?.id || user?._id);
-            if (!validationResult.success) {
-                e.target.value = '';
-                return;
+            // Process and compress image on the fly
+            const { compressedFile, avatarBase64 } = await processImageOnTheFly(file);
+            
+            // Validate the photo using compressed file
+            const validationResult = await validatePhoto(compressedFile, user?.id || user?._id);
+            
+            if (validationResult && validationResult.success) {
+                // If validation succeeds, upload the pre-calculated avatar base64
+                const res = await authAPI.updateProfile({ avatar: avatarBase64 });
+                updateUser(res.data.user);
+                setSuccess('Avatar updated!');
             }
         } catch (err) {
+            console.error('Error handling avatar upload:', err);
+            // Err can be from validation rejection, which is already set in setError by hook
+            if (err.message && err.message !== 'timeout' && err.message !== 'parse_error') {
+                setError(err.response?.data?.error || err.message || 'Failed to process avatar');
+            }
+        } finally {
+            setSavingProfile(false);
             e.target.value = '';
-            return;
         }
-
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            // Resize image to 128x128
-            const img = new Image();
-            img.onload = async () => {
-                const canvas = document.createElement('canvas');
-                const size = 128;
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext('2d');
-
-                // Crop to square (center)
-                const minDim = Math.min(img.width, img.height);
-                const sx = (img.width - minDim) / 2;
-                const sy = (img.height - minDim) / 2;
-                ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
-
-                const base64 = canvas.toDataURL('image/jpeg', 0.8);
-
-                setSavingProfile(true);
-                setError('');
-                setSuccess('');
-                try {
-                    const res = await authAPI.updateProfile({ avatar: base64 });
-                    updateUser(res.data.user);
-                    setSuccess('Avatar updated!');
-                } catch (err) {
-                    setError('Failed to upload avatar');
-                } finally {
-                    setSavingProfile(false);
-                }
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
-
-        // Reset input
-        e.target.value = '';
     };
 
     const handleRemoveAvatar = async () => {
