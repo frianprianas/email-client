@@ -305,21 +305,32 @@ const SettingsDialog = ({ open, onClose }) => {
         setSavingProfile(true);
 
         try {
-            // Process and compress image on the fly
-            const { compressedFile, avatarBase64 } = await processImageOnTheFly(file);
+            let fileToValidate = file;
+            let avatarBase64ToUpload = null;
+
+            // Jika ukuran file lebih dari 2MB, kompres/resize otomatis terlebih dahulu
+            if (file.size > 2 * 1024 * 1024) {
+                const { compressedFile, avatarBase64 } = await processImageOnTheFly(file);
+                fileToValidate = compressedFile;
+                avatarBase64ToUpload = avatarBase64;
+            } else {
+                // Jika di bawah atau sama dengan 2MB, gunakan file asli untuk validasi
+                // Namun tetap buat avatarBase64 128x128 untuk penyimpanan profil
+                const { avatarBase64 } = await processImageOnTheFly(file);
+                avatarBase64ToUpload = avatarBase64;
+            }
             
-            // Validate the photo using compressed file
-            const validationResult = await validatePhoto(compressedFile, user?.id || user?._id);
+            // Validasi foto profil
+            const validationResult = await validatePhoto(fileToValidate, user?.id || user?._id);
             
             if (validationResult && validationResult.success) {
-                // If validation succeeds, upload the pre-calculated avatar base64
-                const res = await authAPI.updateProfile({ avatar: avatarBase64 });
+                // Terapkan avatar jika validasi disetujui
+                const res = await authAPI.updateProfile({ avatar: avatarBase64ToUpload });
                 updateUser(res.data.user);
                 setSuccess('Avatar updated!');
             }
         } catch (err) {
             console.error('Error handling avatar upload:', err);
-            // Err can be from validation rejection, which is already set in setError by hook
             if (err.message && err.message !== 'timeout' && err.message !== 'parse_error') {
                 setError(err.response?.data?.error || err.message || 'Failed to process avatar');
             }
