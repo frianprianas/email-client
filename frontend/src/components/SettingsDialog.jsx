@@ -23,7 +23,8 @@ import {
     Visibility as VisibilityIcon,
     VisibilityOff as VisibilityOffIcon,
     AccessTime as AccessTimeIcon,
-    AutoAwesome as AutoAwesomeIcon
+    AutoAwesome as AutoAwesomeIcon,
+    ZoomIn as ZoomInIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
@@ -122,6 +123,7 @@ const SettingsDialog = ({ open, onClose }) => {
     const [cartoonizing, setCartoonizing] = useState(false);
     const [previewAvatar, setPreviewAvatar] = useState(null);
     const [pollCount, setPollCount] = useState(0);
+    const [zoomImage, setZoomImage] = useState(null);
     const avatarInputRef = useRef(null);
 
     // Phone state
@@ -694,7 +696,14 @@ const SettingsDialog = ({ open, onClose }) => {
                                             opacity: cartoonizing || isValidating ? 0.5 : 1,
                                             '&:hover': { opacity: cartoonizing || isValidating ? 0.5 : 0.8 },
                                         }}
-                                        onClick={() => !cartoonizing && !isValidating && avatarInputRef.current?.click()}
+                                        onClick={() => {
+                                            const currentImg = previewAvatar || user?.avatar;
+                                            if (currentImg) {
+                                                setZoomImage(currentImg);
+                                            } else if (!cartoonizing && !isValidating) {
+                                                avatarInputRef.current?.click();
+                                            }
+                                        }}
                                     >
                                         {getInitials(displayName || user?.email)}
                                     </Avatar>
@@ -743,97 +752,129 @@ const SettingsDialog = ({ open, onClose }) => {
                                     <Typography variant="caption" color="text.disabled">
                                         Click avatar to upload photo (max 2MB)
                                     </Typography>
-                                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                                        {previewAvatar ? (
-                                            <>
-                                                <Button
-                                                    size="small"
-                                                    onClick={handleApplyPreview}
-                                                    disabled={savingProfile}
-                                                    startIcon={savingProfile ? <CircularProgress size={12} /> : <CheckIcon sx={{ fontSize: 14 }} />}
-                                                    sx={{
-                                                        fontSize: '0.7rem',
-                                                        color: 'success.main',
-                                                        textTransform: 'none',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                                    }}
-                                                >
-                                                    Terapkan
-                                                </Button>
-                                                <Button
-                                                    size="small"
-                                                    onClick={handleCancelPreview}
-                                                    disabled={savingProfile}
-                                                    startIcon={<CloseIcon sx={{ fontSize: 14 }} />}
-                                                    sx={{
-                                                        fontSize: '0.7rem',
-                                                        color: 'error.main',
-                                                        textTransform: 'none',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                                    }}
-                                                >
-                                                    Batal
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Button
-                                                    size="small"
-                                                    onClick={handleFetchBaknusAvatar}
-                                                    disabled={fetchingBaknusAvatar}
-                                                    startIcon={fetchingBaknusAvatar ? <CircularProgress size={12} /> : <CameraIcon sx={{ fontSize: 14 }} />}
-                                                    sx={{
-                                                        fontSize: '0.7rem',
-                                                        color: c.accent,
-                                                        textTransform: 'none',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                                    }}
-                                                >
-                                                    Ambil dari Absensi
-                                                </Button>
+                                    <Box sx={{ display: 'flex', gap: 1.5, mt: 0.5, flexWrap: 'wrap' }}>
+                                         {previewAvatar ? (
+                                             <>
+                                                 <Button
+                                                     size="small"
+                                                     onClick={() => setZoomImage(previewAvatar)}
+                                                     startIcon={<ZoomInIcon sx={{ fontSize: 14 }} />}
+                                                     sx={{
+                                                         fontSize: '0.7rem',
+                                                         color: c.accent,
+                                                         textTransform: 'none',
+                                                         p: 0,
+                                                         minWidth: 'auto',
+                                                         '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                     }}
+                                                 >
+                                                     Perbesar Preview
+                                                 </Button>
+                                                 <Button
+                                                     size="small"
+                                                     onClick={handleApplyPreview}
+                                                     disabled={savingProfile}
+                                                     startIcon={savingProfile ? <CircularProgress size={12} /> : <CheckIcon sx={{ fontSize: 14 }} />}
+                                                     sx={{
+                                                         fontSize: '0.7rem',
+                                                         color: 'success.main',
+                                                         textTransform: 'none',
+                                                         p: 0,
+                                                         minWidth: 'auto',
+                                                         '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                     }}
+                                                 >
+                                                     Terapkan
+                                                 </Button>
+                                                 <Button
+                                                     size="small"
+                                                     onClick={handleCancelPreview}
+                                                     disabled={savingProfile}
+                                                     startIcon={<CloseIcon sx={{ fontSize: 14 }} />}
+                                                     sx={{
+                                                         fontSize: '0.7rem',
+                                                         color: 'error.main',
+                                                         textTransform: 'none',
+                                                         p: 0,
+                                                         minWidth: 'auto',
+                                                         '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                     }}
+                                                 >
+                                                     Batal
+                                                 </Button>
+                                             </>
+                                         ) : (
+                                             <>
+                                                 <Button
+                                                     size="small"
+                                                     onClick={handleFetchBaknusAvatar}
+                                                     disabled={fetchingBaknusAvatar}
+                                                     startIcon={fetchingBaknusAvatar ? <CircularProgress size={12} /> : <CameraIcon sx={{ fontSize: 14 }} />}
+                                                     sx={{
+                                                         fontSize: '0.7rem',
+                                                         color: c.accent,
+                                                         textTransform: 'none',
+                                                         p: 0,
+                                                         minWidth: 'auto',
+                                                         '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                     }}
+                                                 >
+                                                     Ambil dari Absensi
+                                                 </Button>
 
-                                                <Button
-                                                    size="small"
-                                                    onClick={() => handleCartoonize()}
-                                                    disabled={cartoonizing || fetchingBaknusAvatar}
-                                                    startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
-                                                    sx={{
-                                                        fontSize: '0.7rem',
-                                                        color: '#fdd663',
-                                                        textTransform: 'none',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                                    }}
-                                                >
-                                                    Animasi AI
-                                                </Button>
-                                                
-                                                {user?.avatar && (
-                                                    <Button
-                                                        size="small"
-                                                        onClick={handleRemoveAvatar}
-                                                        startIcon={<RemoveIcon sx={{ fontSize: 14 }} />}
-                                                        sx={{
-                                                            fontSize: '0.7rem',
-                                                            color: 'error.main',
-                                                            textTransform: 'none',
-                                                            p: 0,
-                                                            minWidth: 'auto',
-                                                            '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-                                                        }}
-                                                    >
-                                                        Remove photo
-                                                    </Button>
-                                                )}
-                                            </>
-                                        )}
+                                                 <Button
+                                                     size="small"
+                                                     onClick={() => handleCartoonize()}
+                                                     disabled={cartoonizing || fetchingBaknusAvatar}
+                                                     startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
+                                                     sx={{
+                                                         fontSize: '0.7rem',
+                                                         color: '#fdd663',
+                                                         textTransform: 'none',
+                                                         p: 0,
+                                                         minWidth: 'auto',
+                                                         '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                     }}
+                                                 >
+                                                     Animasi AI
+                                                 </Button>
+                                                 
+                                                 {user?.avatar && (
+                                                     <>
+                                                         <Button
+                                                             size="small"
+                                                             onClick={() => setZoomImage(user?.avatar)}
+                                                             startIcon={<ZoomInIcon sx={{ fontSize: 14 }} />}
+                                                             sx={{
+                                                                 fontSize: '0.7rem',
+                                                                 color: c.accent,
+                                                                 textTransform: 'none',
+                                                                 p: 0,
+                                                                 minWidth: 'auto',
+                                                                 '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                             }}
+                                                         >
+                                                             Perbesar
+                                                         </Button>
+                                                         <Button
+                                                             size="small"
+                                                             onClick={handleRemoveAvatar}
+                                                             startIcon={<RemoveIcon sx={{ fontSize: 14 }} />}
+                                                             sx={{
+                                                                 fontSize: '0.7rem',
+                                                                 color: 'error.main',
+                                                                 textTransform: 'none',
+                                                                 p: 0,
+                                                                 minWidth: 'auto',
+                                                                 '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
+                                                             }}
+                                                         >
+                                                             Remove photo
+                                                         </Button>
+                                                     </>
+                                                 )}
+                                             </>
+                                         )}
                                     </Box>
                                 </Box>
                             </Box>
@@ -1444,6 +1485,97 @@ const SettingsDialog = ({ open, onClose }) => {
                     {toastMessage}
                 </Alert>
             </Snackbar>
+
+            {/* Dialog Perbesar Preview Foto */}
+            <Dialog
+                open={Boolean(zoomImage)}
+                onClose={() => setZoomImage(null)}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 4,
+                        bgcolor: 'background.paper',
+                        border: `1px solid ${c.dialogBorder}`,
+                        backgroundImage: 'none',
+                        maxWidth: '340px',
+                        width: '90%',
+                    },
+                }}
+            >
+                <DialogTitle sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    pb: 1,
+                }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                        Pratinjau Foto Profil
+                    </Typography>
+                    <IconButton onClick={() => setZoomImage(null)} size="small" sx={{ color: 'text.secondary' }}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pb: 3, pt: 1 }}>
+                    {zoomImage && (
+                        <Box
+                            component="img"
+                            src={zoomImage}
+                            alt="Pratinjau Foto Profil"
+                            sx={{
+                                width: '280px',
+                                height: '280px',
+                                borderRadius: '16px',
+                                objectFit: 'cover',
+                                border: `2px solid ${c.cardBorder}`,
+                                mb: 2.5,
+                            }}
+                        />
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', mb: 2, display: 'block' }}>
+                        {zoomImage === previewAvatar ? 'Hasil pratinjau animasi AI sebelum diterapkan.' : 'Foto profil Anda saat ini.'}
+                    </Typography>
+                    {zoomImage === previewAvatar && (
+                        <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={async () => {
+                                    await handleApplyPreview();
+                                    setZoomImage(null);
+                                }}
+                                disabled={savingProfile}
+                                startIcon={savingProfile ? <CircularProgress size={16} /> : <CheckIcon sx={{ fontSize: 16 }} />}
+                                sx={{
+                                    bgcolor: 'success.main',
+                                    color: 'white',
+                                    textTransform: 'none',
+                                    borderRadius: 2,
+                                    '&:hover': { bgcolor: 'success.dark' }
+                                }}
+                            >
+                                Terapkan
+                            </Button>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                onClick={() => {
+                                    handleCancelPreview();
+                                    setZoomImage(null);
+                                }}
+                                startIcon={<CloseIcon sx={{ fontSize: 16 }} />}
+                                sx={{
+                                    color: 'error.main',
+                                    borderColor: 'error.main',
+                                    textTransform: 'none',
+                                    borderRadius: 2,
+                                    '&:hover': { borderColor: 'error.dark', bgcolor: 'rgba(211,47,47,0.04)' }
+                                }}
+                            >
+                                Batal
+                            </Button>
+                        </Box>
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
     );
 };
