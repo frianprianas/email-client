@@ -16,11 +16,7 @@ services:
       - app_network
 
   backend:
-    build:
-      context: ./backend
-      dns:
-        - 8.8.8.8
-        - 1.1.1.1
+    build: ./backend
     restart: always
     dns:
       - 8.8.8.8
@@ -40,7 +36,7 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - MAILCOW_API_URL=${MAILCOW_API_URL}
       - MAILCOW_API_KEY=${MAILCOW_API_KEY}
-      - DEEPAI_API_KEY=${DEEPAI_API_KEY}
+      - DEEPAI_API_KEY=${DEEPAI_API_KEY:-}
     depends_on:
       - db
     ports:
@@ -49,11 +45,7 @@ services:
       - app_network
 
   frontend:
-    build:
-      context: ./frontend
-      dns:
-        - 8.8.8.8
-        - 1.1.1.1
+    build: ./frontend
     restart: always
     ports:
       - "8080:80"
