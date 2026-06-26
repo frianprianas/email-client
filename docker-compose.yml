@@ -16,7 +16,11 @@ services:
       - app_network
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dns:
+        - 8.8.8.8
+        - 1.1.1.1
     restart: always
     dns:
       - 8.8.8.8
@@ -45,7 +49,11 @@ services:
       - app_network
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dns:
+        - 8.8.8.8
+        - 1.1.1.1
     restart: always
     ports:
       - "8080:80"
