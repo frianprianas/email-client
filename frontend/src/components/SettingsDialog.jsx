@@ -1132,7 +1132,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                             />
                                             <Button
                                                 variant="contained"
-                                                onClick={handleRequestOtp}
+                                                onClick={() => handleRequestOtp('verification')}
                                                 disabled={requestingOtp || !phoneNumber.trim()}
                                                 startIcon={requestingOtp ? <CircularProgress size={16} /> : <WhatsAppIcon />}
                                                 size="small"
