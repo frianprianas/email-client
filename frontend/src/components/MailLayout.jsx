@@ -9,6 +9,8 @@ import Sidebar from './Sidebar';
 import MessageList from './MessageList';
 import MessageView from './MessageView';
 import ComposeDialog from './ComposeDialog';
+import { useAuth } from '../App';
+import AdminMailboxList from './AdminMailboxList';
 
 const DRAWER_WIDTH = 256;
 
@@ -17,6 +19,7 @@ const MailLayout = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
 
     const [drawerOpen, setDrawerOpen] = useState(!isMobile);
     const [currentFolder, setCurrentFolder] = useState('INBOX');
@@ -427,6 +430,12 @@ const MailLayout = () => {
                                 />
                             }
                         />
+                        {user?.isAdmin && (
+                            <Route
+                                path="/admin/emails"
+                                element={<AdminMailboxList />}
+                            />
+                        )}
                     </Routes>
                 </Box>
             </Box>

@@ -51,6 +51,10 @@ router.post('/login', async (req, res) => {
         const durationDays = user.sessionDuration || 7;
         const expiresMs = durationDays * 24 * 60 * 60 * 1000;
 
+        // Fetch Mailcow tags to check admin role
+        const tags = await mailcowService.getMailboxTags(email);
+        const isAdmin = tags.some(tag => tag.toLowerCase() === 'admin');
+
         // Generate JWT
         const token = jwt.sign(
             { id: user.id, email: user.email },
@@ -76,7 +80,8 @@ router.post('/login', async (req, res) => {
                 signature: user.signature,
                 phoneNumber: user.phoneNumber,
                 isPhoneVerified: user.isPhoneVerified,
-                sessionDuration: user.sessionDuration
+                sessionDuration: user.sessionDuration,
+                isAdmin
             },
             token
         });
@@ -94,19 +99,41 @@ router.post('/logout', (req, res) => {
 
 // Get current user
 router.get('/me', authMiddleware, async (req, res) => {
-    res.json({
-        user: {
-            id: req.user.id,
-            email: req.user.email,
-            displayName: req.user.displayName,
-            avatar: req.user.avatar,
-            theme: req.user.theme,
-            signature: req.user.signature,
-            phoneNumber: req.user.phoneNumber,
-            isPhoneVerified: req.user.isPhoneVerified,
-            sessionDuration: req.user.sessionDuration
-        }
-    });
+    try {
+        const tags = await mailcowService.getMailboxTags(req.user.email);
+        const isAdmin = tags.some(tag => tag.toLowerCase() === 'admin');
+
+        res.json({
+            user: {
+                id: req.user.id,
+                email: req.user.email,
+                displayName: req.user.displayName,
+                avatar: req.user.avatar,
+                theme: req.user.theme,
+                signature: req.user.signature,
+                phoneNumber: req.user.phoneNumber,
+                isPhoneVerified: req.user.isPhoneVerified,
+                sessionDuration: req.user.sessionDuration,
+                isAdmin
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching user tags in /me:', error);
+        res.json({
+            user: {
+                id: req.user.id,
+                email: req.user.email,
+                displayName: req.user.displayName,
+                avatar: req.user.avatar,
+                theme: req.user.theme,
+                signature: req.user.signature,
+                phoneNumber: req.user.phoneNumber,
+                isPhoneVerified: req.user.isPhoneVerified,
+                sessionDuration: req.user.sessionDuration,
+                isAdmin: false
+            }
+        });
+    }
 });
 
 // Update profile
@@ -505,6 +532,42 @@ router.get('/avatar/validate/status/:jobId', authMiddleware, async (req, res) =>
     } catch (error) {
         console.error('Error checking validation status:', error);
         res.status(500).json({ error: error.message || 'Gagal mengecek status validasi.' });
+    }
+});
+
+// Admin endpoint to list all mailboxes from Mailcow
+router.get('/admin/mailboxes', authMiddleware, async (req, res) => {
+    try {
+        // Double check if the requesting user has the "admin" tag
+        const tags = await mailcowService.getMailboxTags(req.user.email);
+        const isAdmin = tags.some(tag => tag.toLowerCase() === 'admin');
+
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Akses ditolak. Menu ini hanya untuk Admin.' });
+        }
+
+        // Fetch all mailboxes from Mailcow
+        const allMailboxes = await mailcowService.getAllMailboxes();
+        
+        // Parse all mailboxes to get name, email, and tags
+        let mailboxList = [];
+        if (Array.isArray(allMailboxes)) {
+            mailboxList = allMailboxes;
+        } else if (allMailboxes && typeof allMailboxes === 'object') {
+            // If it's a dictionary keyed by email or something
+            mailboxList = Object.values(allMailboxes);
+        }
+
+        const formattedMailboxes = mailboxList.map(mb => ({
+            name: mb.name || mb.displayName || '',
+            email: mb.username || mb.email || (mb.local_part && mb.domain ? `${mb.local_part}@${mb.domain}` : ''),
+            tags: Array.isArray(mb.tags) ? mb.tags : (mb.tags ? [mb.tags] : [])
+        }));
+
+        res.json({ mailboxes: formattedMailboxes });
+    } catch (error) {
+        console.error('Get admin mailboxes error:', error);
+        res.status(500).json({ error: error.message || 'Gagal mengambil daftar email admin' });
     }
 });
 

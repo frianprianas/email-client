@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
     Box, List, ListItemButton, ListItemIcon, ListItemText,
     Typography, Badge, Button, Divider, Tooltip, Avatar
@@ -17,7 +17,8 @@ import {
     AllInbox as AllMailIcon,
     Edit as ComposeIcon,
     Folder as FolderIcon,
-    HelpOutline as HelpIcon
+    HelpOutline as HelpIcon,
+    AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '../App';
@@ -39,6 +40,7 @@ const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDr
     const theme = useTheme();
     const c = theme.palette.custom;
     const { user } = useAuth();
+    const location = useLocation();
 
     const getInitials = (name) => {
         if (!name) return '?';
@@ -121,7 +123,7 @@ const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDr
                         }
 
                         const Icon = folder.icon;
-                        const isSelected = currentFolder === folder.id;
+                        const isSelected = (location.pathname === '/' || location.pathname.startsWith('/message')) && currentFolder === folder.id;
                         const badgeCount = folder.showBadge ? unseenCount : 0;
 
                         if (miniDrawer) {
@@ -207,6 +209,51 @@ const Sidebar = ({ currentFolder, onFolderChange, onCompose, unseenCount, miniDr
                     })}
 
                     <Divider sx={{ my: 1 }} />
+                    {user?.isAdmin && (
+                        miniDrawer ? (
+                            <Tooltip title="Admin Panel" placement="right">
+                                <ListItemButton
+                                    component={Link}
+                                    to="/admin/emails"
+                                    selected={location.pathname === '/admin/emails'}
+                                    sx={{
+                                        justifyContent: 'center',
+                                        px: 2,
+                                        py: 1,
+                                        mx: 0.5,
+                                        borderRadius: '50%',
+                                        minHeight: 48,
+                                    }}
+                                >
+                                    <AdminIcon sx={{ fontSize: 20, color: location.pathname === '/admin/emails' ? c.selectedColor : 'text.secondary' }} />
+                                </ListItemButton>
+                            </Tooltip>
+                        ) : (
+                            <ListItemButton
+                                component={Link}
+                                to="/admin/emails"
+                                selected={location.pathname === '/admin/emails'}
+                                sx={{
+                                    py: 0.5,
+                                    minHeight: 32,
+                                    mr: 2,
+                                }}
+                            >
+                                <ListItemIcon sx={{ minWidth: 40 }}>
+                                    <AdminIcon sx={{ fontSize: 20, color: location.pathname === '/admin/emails' ? c.selectedColor : 'text.secondary' }} />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Admin Panel"
+                                    primaryTypographyProps={{
+                                        fontSize: '0.8125rem',
+                                        fontWeight: location.pathname === '/admin/emails' ? 600 : 400,
+                                        color: location.pathname === '/admin/emails' ? c.selectedColor : 'text.primary',
+                                    }}
+                                />
+                            </ListItemButton>
+                        )
+                    )}
+                    {user?.isAdmin && <Divider sx={{ my: 1 }} />}
                     {miniDrawer ? (
                         <Tooltip title="Tatacara Penggunaan" placement="right">
                             <ListItemButton
