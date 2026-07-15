@@ -96,4 +96,35 @@ const getAllMailboxes = async () => {
     }
 };
 
-module.exports = { changePassword, getMailboxTags, getAllMailboxes };
+/**
+ * Update tags of a mailbox in Mailcow
+ * @param {string} email
+ * @param {string[]} tags
+ * @returns {Promise<any>}
+ */
+const updateMailboxTags = async (email, tags) => {
+    try {
+        const response = await axios.post(`${MAILCOW_API_URL}/api/v1/edit/mailbox`, {
+            attr: {
+                tags: tags
+            },
+            items: [email]
+        }, {
+            headers: {
+                'X-API-Key': MAILCOW_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (Array.isArray(response.data) && response.data[0]?.type === 'error') {
+            throw new Error(response.data[0].msg || 'Gagal mengubah tag di server Mailcow');
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error('Mailcow API error in updateMailboxTags:', error.response?.data || error.message);
+        throw new Error('Gagal menghubungi server Mailcow untuk pembaruan tag');
+    }
+};
+
+module.exports = { changePassword, getMailboxTags, getAllMailboxes, updateMailboxTags };

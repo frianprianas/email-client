@@ -571,4 +571,31 @@ router.get('/admin/mailboxes', authMiddleware, async (req, res) => {
     }
 });
 
+// Admin endpoint to update mailbox tags
+router.post('/admin/mailbox/tags', authMiddleware, async (req, res) => {
+    try {
+        const { email, tags } = req.body;
+
+        if (!email || !Array.isArray(tags)) {
+            return res.status(400).json({ error: 'Email dan array tags diperlukan' });
+        }
+
+        // Double check if the requesting user has the "admin" tag
+        const userTags = await mailcowService.getMailboxTags(req.user.email);
+        const isAdmin = userTags.some(tag => tag.toLowerCase() === 'admin');
+
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Akses ditolak. Menu ini hanya untuk Admin.' });
+        }
+
+        // Update tags in Mailcow
+        await mailcowService.updateMailboxTags(email, tags);
+
+        res.json({ message: 'Tag berhasil diperbarui', email, tags });
+    } catch (error) {
+        console.error('Update tags error:', error);
+        res.status(500).json({ error: error.message || 'Gagal memperbarui tag di server Mailcow' });
+    }
+});
+
 module.exports = router;

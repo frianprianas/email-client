@@ -46,6 +46,7 @@ export const authAPI = {
     getCartoonizeStatus: (jobId) => api.get(`/auth/avatar/cartoonize/status/${jobId}`),
     fetchCartoonizeImage: (imagePath) => api.post('/auth/avatar/cartoonize/image', { imagePath }),
     getAdminMailboxes: () => api.get('/auth/admin/mailboxes'),
+    updateAdminMailboxTags: (email, tags) => api.post('/auth/admin/mailbox/tags', { email, tags }),
 };
 
 // Mail API
