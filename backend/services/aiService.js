@@ -281,21 +281,42 @@ async function cartoonizeOnline(base64Image, style = 'japanese') {
             }
         );
 
-        const replyContent = response.data?.choices?.[0]?.message?.content || '';
-        console.log('[aiService] Respons AI Online Cartoonize:', replyContent);
+        const message = response.data?.choices?.[0]?.message;
+        const replyContent = message?.content || '';
+        console.log('[aiService] Respons AI Online Cartoonize (text content):', replyContent);
 
-        // Cari URL gambar dari respons AI
-        const urlRegex = /(https?:\/\/[^\s\)\"\'\>]+)/i;
-        const match = replyContent.match(urlRegex);
-        if (!match) {
+        let finalImageUri = '';
+
+        // Case 1: Cek array images kustom yang dikembalikan oleh proxy Aivene
+        if (message?.images && message.images.length > 0) {
+            const imgObj = message.images[0];
+            const urlVal = imgObj.image_url?.url || imgObj.url;
+            if (urlVal && urlVal.startsWith('data:image')) {
+                console.log('[aiService] Berhasil mendapatkan base64 data URI langsung dari message.images[0]');
+                return urlVal;
+            } else if (urlVal && urlVal.startsWith('http')) {
+                finalImageUri = urlVal;
+            }
+        }
+
+        // Case 2: Cari URL HTTP di dalam content teks sebagai fallback
+        if (!finalImageUri) {
+            const urlRegex = /(https?:\/\/[^\s\)\"\'\>]+)/i;
+            const match = replyContent.match(urlRegex);
+            if (match) {
+                finalImageUri = match[1];
+            }
+        }
+
+        if (!finalImageUri) {
+            console.error('[aiService] Gagal memparsing gambar dari respons:', JSON.stringify(response.data));
             throw new Error('Gagal mendapatkan URL gambar hasil animasi dari respons AI.');
         }
 
-        const generatedImageUrl = match[1];
-        console.log('[aiService] Mengunduh gambar hasil animasi dari:', generatedImageUrl);
+        console.log('[aiService] Mengunduh gambar hasil animasi dari:', finalImageUri);
 
         // Download gambar tersebut dan ubah menjadi base64 data URI
-        const imageRes = await axios.get(generatedImageUrl, {
+        const imageRes = await axios.get(finalImageUri, {
             responseType: 'arraybuffer',
             timeout: 30000
         });
