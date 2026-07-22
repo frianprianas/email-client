@@ -428,9 +428,10 @@ router.get('/info/:email', async (req, res) => {
     }
 });
 
-// Animasi avatar - Step 1: Submit job ke Anime API, langsung return job_id
+// Animasi avatar - Step 1: Submit job ke Anime API (Lokal atau Online)
 router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
     try {
+        const { mode = 'local', style = 'japanese' } = req.body;
         let base64Avatar = req.user.avatar;
 
         // Hanya berlaku untuk user yang sudah memiliki foto profil
@@ -448,23 +449,43 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             }
         }
 
-        // Submit ke Anime API, langsung dapat job_id tanpa menunggu
-        const jobId = await aiService.submitCartoonize(base64Avatar, req.user.id);
+        if (mode === 'online') {
+            console.log('[auth] Memproses animasi avatar menggunakan AI Online...');
+            const dataUri = await aiService.cartoonizeOnline(base64Avatar, style);
 
-        // Hitung dan simpan counter
-        const newCount = (req.user.lastAiGenerationDate === todayStr)
-            ? (req.user.aiGenerationsToday + 1)
-            : 1;
-        await req.user.update({
-            aiGenerationsToday: newCount,
-            lastAiGenerationDate: todayStr
-        });
+            // Hitung dan simpan counter
+            const newCount = (req.user.lastAiGenerationDate === todayStr)
+                ? (req.user.aiGenerationsToday + 1)
+                : 1;
+            await req.user.update({
+                aiGenerationsToday: newCount,
+                lastAiGenerationDate: todayStr
+            });
 
-        res.json({
-            jobId,
-            message: `Animasi sedang diproses... (${newCount}/2 hari ini)`
-        });
+            return res.json({
+                status: 'done',
+                imageDataUri: dataUri,
+                message: `Animasi online berhasil dibuat! (${newCount}/2 hari ini)`
+            });
+        } else {
+            console.log('[auth] Memproses animasi avatar menggunakan AI Lokal...');
+            // Submit ke Anime API, langsung dapat job_id tanpa menunggu
+            const jobId = await aiService.submitCartoonize(base64Avatar, req.user.id);
 
+            // Hitung dan simpan counter
+            const newCount = (req.user.lastAiGenerationDate === todayStr)
+                ? (req.user.aiGenerationsToday + 1)
+                : 1;
+            await req.user.update({
+                aiGenerationsToday: newCount,
+                lastAiGenerationDate: todayStr
+            });
+
+            return res.json({
+                jobId,
+                message: `Animasi sedang diproses... (${newCount}/2 hari ini)`
+            });
+        }
     } catch (error) {
         console.error('Error submitting cartoonize job:', error);
         res.status(500).json({ error: error.message || 'Gagal mengirim foto ke server animasi AI.' });

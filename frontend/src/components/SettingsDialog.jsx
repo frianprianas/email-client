@@ -156,6 +156,11 @@ const SettingsDialog = ({ open, onClose }) => {
     const [modalError, setModalError] = useState('');
     const [validatingInModal, setValidatingInModal] = useState(false);
 
+    // Cartoonize Modal State
+    const [cartoonizeDialogOpen, setCartoonizeDialogOpen] = useState(false);
+    const [cartoonizeMode, setCartoonizeMode] = useState('local'); // 'local' atau 'online'
+    const [cartoonizeStyle, setCartoonizeStyle] = useState('japanese'); // 'japanese' atau 'american'
+
     const {
         isValidating,
         validationError,
@@ -394,21 +399,29 @@ const SettingsDialog = ({ open, onClose }) => {
         }
     };
 
-    const handleCartoonize = async () => {
+    const handleCartoonize = async (mode = 'local', style = 'japanese') => {
         setCartoonizing(true);
         setPollCount(0);
         setError('');
         setSuccess('');
         try {
-            // Step 1: Submit job ke backend, langsung dapat job_id
-            const submitRes = await authAPI.cartoonizeAvatar();
-            const jobId = submitRes.data.jobId;
+            // Step 1: Submit job ke backend, langsung dapat job_id atau hasil online instan
+            const submitRes = await authAPI.cartoonizeAvatar({ mode, style });
+            
+            // Jika mode online, response langsung mengembalikan hasil instan
+            if (submitRes.data && submitRes.data.status === 'done') {
+                setPreviewAvatar(submitRes.data.imageDataUri);
+                setSuccess(submitRes.data.message || 'Preview berhasil dibuat! Silakan terapkan jika Anda suka.');
+                setCartoonizing(false);
+                return;
+            }
 
+            const jobId = submitRes.data.jobId;
             if (!jobId) {
                 throw new Error('Tidak menerima job ID dari server.');
             }
 
-            // Step 2: Polling status setiap 5 detik
+            // Step 2: Polling status setiap 5 detik (for local mode)
             let attempts = 0;
             const maxAttempts = 36; // Maks 3 menit
 
@@ -451,28 +464,28 @@ const SettingsDialog = ({ open, onClose }) => {
                         } catch (dlErr) {
                             console.warn('[download] Gagal download gambar:', dlErr.message);
                             if (retries > 0) {
-                                setTimeout(() => downloadWithRetry(retries - 1, delay + 2000), delay);
-                            } else {
-                                setError('Gagal mengunduh gambar hasil animasi. Coba lagi.');
-                                setCartoonizing(false);
-                            }
-                        }
-                    };
-                    downloadWithRetry();
-                } else {
-                    // Masih processing
-                    setTimeout(poll, 5000);
-                }
-            };
+                                                        setTimeout(() => downloadWithRetry(retries - 1, delay + 2000), delay);
+                                                    } else {
+                                                        setError('Gagal mengunduh gambar hasil animasi. Coba lagi.');
+                                                        setCartoonizing(false);
+                                                    }
+                                                }
+                                            };
+                                            downloadWithRetry();
+                                        } else {
+                                            // Masih processing
+                                            setTimeout(poll, 5000);
+                                        }
+                                    };
 
-            setTimeout(poll, 5000); // mulai polling setelah 5 detik pertama
+                                    setTimeout(poll, 5000); // mulai polling setelah 5 detik pertama
 
-        } catch (err) {
-            console.error('[cartoonize] Error submit:', err);
-            setError(err.response?.data?.error || 'Gagal mengirim foto ke server animasi AI');
-            setCartoonizing(false);
-        }
-    };
+                                } catch (err) {
+                                    console.error('[cartoonize] Error submit:', err);
+                                    setError(err.response?.data?.error || 'Gagal mengirim foto ke server animasi AI');
+                                    setCartoonizing(false);
+                                }
+                            };
 
     const handleApplyPreview = async () => {
         if (!previewAvatar) return;
@@ -1780,6 +1793,160 @@ const SettingsDialog = ({ open, onClose }) => {
                         sx={{ textTransform: 'none', bgcolor: c.accent, '&:hover': { bgcolor: c.accentHover } }}
                     >
                         {validatingInModal ? 'Memproses...' : 'Proses Verifikasi'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal Dialog Animasi AI (Cartoonize) */}
+            <Dialog
+                open={cartoonizeDialogOpen}
+                onClose={() => !cartoonizing && setCartoonizeDialogOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        bgcolor: 'background.paper',
+                        color: 'text.primary',
+                        border: `1px solid ${c.dialogBorder || c.cardBorder}`,
+                        backgroundImage: 'none',
+                    }
+                }}
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                        Animasi AI Foto Profil
+                    </Typography>
+                    <IconButton
+                        size="small"
+                        onClick={() => setCartoonizeDialogOpen(false)}
+                        disabled={cartoonizing}
+                    >
+                        <CloseIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent dividers sx={{ borderColor: c.cardBorder }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                        Pilih Mode Animasi:
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2.5 }}>
+                        <Paper
+                            elevation={0}
+                            onClick={() => !cartoonizing && setCartoonizeMode('local')}
+                            sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                border: `2px solid ${cartoonizeMode === 'local' ? c.accent : c.cardBorder}`,
+                                bgcolor: cartoonizeMode === 'local' ? (isDark ? 'rgba(138, 180, 248, 0.08)' : 'rgba(25, 118, 210, 0.04)') : 'transparent',
+                                cursor: cartoonizing ? 'default' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <LocalIcon color={cartoonizeMode === 'local' ? 'primary' : 'action'} />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    Baknus AI offline
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Menggunakan server AI lokal (Proses antrean).
+                                </Typography>
+                            </Box>
+                            <Radio checked={cartoonizeMode === 'local'} size="small" />
+                        </Paper>
+
+                        <Paper
+                            elevation={0}
+                            onClick={() => !cartoonizing && setCartoonizeMode('online')}
+                            sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                border: `2px solid ${cartoonizeMode === 'online' ? c.accent : c.cardBorder}`,
+                                bgcolor: cartoonizeMode === 'online' ? (isDark ? 'rgba(138, 180, 248, 0.08)' : 'rgba(25, 118, 210, 0.04)') : 'transparent',
+                                cursor: cartoonizing ? 'default' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <CloudIcon color={cartoonizeMode === 'online' ? 'primary' : 'action'} />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    BaknusAI online
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Cepat. Menggunakan Gemini 2.5 Flash Image.
+                                </Typography>
+                            </Box>
+                            <Radio checked={cartoonizeMode === 'online'} size="small" />
+                        </Paper>
+                    </Box>
+
+                    {cartoonizeMode === 'online' && (
+                        <>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                                Pilih Gaya Animasi:
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+                                <Chip
+                                    label="Anime Bergaya Jepang"
+                                    clickable
+                                    color={cartoonizeStyle === 'japanese' ? 'primary' : 'default'}
+                                    variant={cartoonizeStyle === 'japanese' ? 'filled' : 'outlined'}
+                                    onClick={() => !cartoonizing && setCartoonizeStyle('japanese')}
+                                    sx={{ fontWeight: 500 }}
+                                />
+                                <Chip
+                                    label="Animasi Gaya Amerika"
+                                    clickable
+                                    color={cartoonizeStyle === 'american' ? 'primary' : 'default'}
+                                    variant={cartoonizeStyle === 'american' ? 'filled' : 'outlined'}
+                                    onClick={() => !cartoonizing && setCartoonizeStyle('american')}
+                                    sx={{ fontWeight: 500 }}
+                                />
+                            </Box>
+                        </>
+                    )}
+
+                    {cartoonizing && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 2, bgcolor: isDark ? '#2a2b2d' : '#f1f3f4', mt: 1 }}>
+                            <CircularProgress size={20} />
+                            <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                {cartoonizeMode === 'online' 
+                                    ? 'Sedang membuat pratinjau animasi online...' 
+                                    : `Menunggu hasil animasi lokal... (cek ke-${pollCount}/36)`}
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button
+                        onClick={() => setCartoonizeDialogOpen(false)}
+                        disabled={cartoonizing}
+                        color="inherit"
+                        size="small"
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Batal
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={async () => {
+                            setCartoonizeDialogOpen(false);
+                            await handleCartoonize(cartoonizeMode, cartoonizeStyle);
+                        }}
+                        disabled={cartoonizing}
+                        size="small"
+                        startIcon={cartoonizing ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 14 }} />}
+                        sx={{ textTransform: 'none', bgcolor: c.accent, '&:hover': { bgcolor: c.accentHover } }}
+                    >
+                        Mulai Animasi
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -193,6 +193,83 @@ atau jika menolak:
     }
 }
 
+/**
+ * Anime/Cartoonize foto profil menggunakan AI Online (Gemini 2.5 Flash Image via Aivene API)
+ */
+async function cartoonizeOnline(base64Image, style = 'japanese') {
+    const apiKey = process.env.API_BANANA;
+    if (!apiKey) {
+        throw new Error('API Key Banana (API_BANANA) belum dikonfigurasi di server.');
+    }
+
+    let dataUri = base64Image;
+    if (!dataUri.startsWith('data:')) {
+        dataUri = `data:image/jpeg;base64,${base64Image}`;
+    }
+
+    const stylePrompt = style === 'american'
+        ? 'american animation style / Disney / Pixar style 3D cartoon'
+        : 'japanese style anime / manga illustration';
+
+    const promptText = `Ubah foto profil ini menjadi gambar animasi bergaya ${stylePrompt}. Pastikan untuk tetap mempertahankan kemiripan fitur wajah utama (seperti bentuk wajah, mata, ekspresi) dan gaya rambut dari orang yang ada di foto asli agar tetap dapat dikenali.`;
+
+    console.log(`[aiService] Mengirim gambar ke AI Online Cartoonize (Gemini 2.5 Flash Image) dengan gaya ${style}...`);
+
+    try {
+        const response = await axios.post(
+            'https://api.aivene.com/v1/chat/completions',
+            {
+                model: 'gemini-2.5-flash-image',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: promptText },
+                            {
+                                type: 'image_url',
+                                image_url: { url: dataUri }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                timeout: 60000
+            }
+        );
+
+        const replyContent = response.data?.choices?.[0]?.message?.content || '';
+        console.log('[aiService] Respons AI Online Cartoonize:', replyContent);
+
+        // Cari URL gambar dari respons AI
+        const urlRegex = /(https?:\/\/[^\s\)\"\'\>]+)/i;
+        const match = replyContent.match(urlRegex);
+        if (!match) {
+            throw new Error('Gagal mendapatkan URL gambar hasil animasi dari respons AI.');
+        }
+
+        const generatedImageUrl = match[1];
+        console.log('[aiService] Mengunduh gambar hasil animasi dari:', generatedImageUrl);
+
+        // Download gambar tersebut dan ubah menjadi base64 data URI
+        const imageRes = await axios.get(generatedImageUrl, {
+            responseType: 'arraybuffer',
+            timeout: 30000
+        });
+
+        const resultBase64 = Buffer.from(imageRes.data).toString('base64');
+        const contentType = imageRes.headers['content-type'] || 'image/jpeg';
+        return `data:${contentType};base64,${resultBase64}`;
+    } catch (error) {
+        console.error('[aiService] Error cartoonize AI Online:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.error?.message || error.message || 'Gagal memproses animasi dengan AI Online.');
+    }
+}
+
 
 module.exports = {
     submitCartoonize,
@@ -201,5 +278,7 @@ module.exports = {
     submitValidation,
     getValidationStatus,
     validatePhotoOnline,
+    cartoonizeOnline,
 };
+
 
