@@ -195,11 +195,15 @@ atau jika menolak:
 
 /**
  * Anime/Cartoonize foto profil menggunakan AI Online (Gemini 2.5 Flash Image via Aivene API)
+ * Alur:
+ * 1. Gunakan gemini-2.5-flash untuk mendeskripsikan foto profil user (karena model ini mendukung analisis gambar).
+ * 2. Ambil deskripsi tersebut, gabungkan dengan gaya yang diinginkan (Jepang / Amerika).
+ * 3. Kirim prompt teks tersebut ke gemini-2.5-flash-image untuk menghasilkan gambar baru (karena model ini hanya mendukung input teks).
  */
 async function cartoonizeOnline(base64Image, style = 'japanese') {
-    const apiKey = process.env.API_BANANA;
+    const apiKey = process.env.API_BANANA || process.env.API_ONLINE;
     if (!apiKey) {
-        throw new Error('API Key Banana (API_BANANA) belum dikonfigurasi di server.');
+        throw new Error('API Key Banana (API_BANANA) atau Online (API_ONLINE) belum dikonfigurasi di server.');
     }
 
     let dataUri = base64Image;
@@ -207,13 +211,54 @@ async function cartoonizeOnline(base64Image, style = 'japanese') {
         dataUri = `data:image/jpeg;base64,${base64Image}`;
     }
 
+    console.log('[aiService] Langkah 1: Menganalisis wajah foto menggunakan Gemini 2.5 Flash...');
+    
+    let description = 'an Asian man with short hair';
+    try {
+        const analyzeRes = await axios.post(
+            'https://api.aivene.com/v1/chat/completions',
+            {
+                model: 'gemini-2.5-flash',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            { 
+                                type: 'text', 
+                                text: 'Describe the person in this profile photo for an image generation prompt. Include gender, approximate age, hairstyle/haircut and color, facial shape, facial features (eyes, eyebrows, nose), clothing type and color, expression (smiling, neutral, etc.), and background. Keep the description concise but highly specific, about 1-2 sentences. Avoid quality buzzwords.' 
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: { url: dataUri }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                timeout: 30000
+            }
+        );
+
+        const analyzeContent = analyzeRes.data?.choices?.[0]?.message?.content || '';
+        if (analyzeContent) {
+            description = analyzeContent.trim();
+            console.log('[aiService] Deskripsi foto berhasil didapatkan:', description);
+        }
+    } catch (err) {
+        console.warn('[aiService] Gagal menganalisis foto, menggunakan deskripsi fallback:', err.message);
+    }
+
+    // Gabungkan dengan prompt gaya animasi
     const stylePrompt = style === 'american'
-        ? 'american animation style / Disney / Pixar style 3D cartoon'
-        : 'japanese style anime / manga illustration';
+        ? `American animation style, Pixar or Disney 3D cartoon character, close-up portrait of ${description}. Friendly expression, detailed animation textures, soft lighting.`
+        : `Japanese anime drawing style, modern anime/manga key visual, close-up portrait of ${description}. Clean lines, vibrant anime colors, highly detailed.`;
 
-    const promptText = `Ubah foto profil ini menjadi gambar animasi bergaya ${stylePrompt}. Pastikan untuk tetap mempertahankan kemiripan fitur wajah utama (seperti bentuk wajah, mata, ekspresi) dan gaya rambut dari orang yang ada di foto asli agar tetap dapat dikenali.`;
-
-    console.log(`[aiService] Mengirim gambar ke AI Online Cartoonize (Gemini 2.5 Flash Image) dengan gaya ${style}...`);
+    console.log(`[aiService] Langkah 2: Mengirim prompt ke Gemini 2.5 Flash Image untuk menggambar gaya ${style}...`);
 
     try {
         const response = await axios.post(
@@ -223,13 +268,7 @@ async function cartoonizeOnline(base64Image, style = 'japanese') {
                 messages: [
                     {
                         role: 'user',
-                        content: [
-                            { type: 'text', text: promptText },
-                            {
-                                type: 'image_url',
-                                image_url: { url: dataUri }
-                            }
-                        ]
+                        content: stylePrompt
                     }
                 ]
             },
