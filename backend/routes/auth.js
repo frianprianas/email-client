@@ -439,17 +439,19 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Harap unggah foto profil terlebih dahulu sebelum menggunakan fitur animasi AI.' });
         }
 
-        // Batasan harian: maksimal 4 kali per hari
+        // Batasan harian khusus online: maksimal 1 kali per hari
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-        if (req.user.lastAiGenerationDate === todayStr) {
-            if (req.user.aiGenerationsToday >= 4) {
-                return res.status(400).json({ error: 'Batas harian tercapai. Anda hanya dapat menggunakan fitur Animasi AI ini maksimal 4 kali dalam sehari.' });
-            }
-        }
-
         if (mode === 'online') {
+            if (req.user.lastAiGenerationDate === todayStr) {
+                if (req.user.aiGenerationsToday >= 1) {
+                    return res.status(400).json({ 
+                        error: 'Batas harian tercapai. Anda hanya dapat menggunakan fitur Animasi BaknusAI Online maksimal 1 kali dalam sehari. Silakan gunakan Baknus AI offline untuk membuat animasi lagi.' 
+                    });
+                }
+            }
+
             console.log('[auth] Memproses animasi avatar menggunakan AI Online...');
             const dataUri = await aiService.cartoonizeOnline(base64Avatar, style);
 
@@ -465,25 +467,16 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             return res.json({
                 status: 'done',
                 imageDataUri: dataUri,
-                message: `Animasi online berhasil dibuat! (${newCount}/4 hari ini)`
+                message: `Animasi online berhasil dibuat! (${newCount}/1 hari ini)`
             });
         } else {
             console.log('[auth] Memproses animasi avatar menggunakan AI Lokal...');
             // Submit ke Anime API, langsung dapat job_id tanpa menunggu
             const jobId = await aiService.submitCartoonize(base64Avatar, req.user.id);
 
-            // Hitung dan simpan counter
-            const newCount = (req.user.lastAiGenerationDate === todayStr)
-                ? (req.user.aiGenerationsToday + 1)
-                : 1;
-            await req.user.update({
-                aiGenerationsToday: newCount,
-                lastAiGenerationDate: todayStr
-            });
-
             return res.json({
                 jobId,
-                message: `Animasi sedang diproses... (${newCount}/4 hari ini)`
+                message: `Animasi sedang diproses menggunakan Baknus AI offline...`
             });
         }
     } catch (error) {
