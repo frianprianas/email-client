@@ -1652,9 +1652,10 @@ const SettingsDialog = ({ open, onClose }) => {
                 PaperProps={{
                     sx: {
                         borderRadius: 3,
-                        bgcolor: c.cardBg,
+                        bgcolor: 'background.paper',
                         color: 'text.primary',
-                        border: `1px solid ${c.cardBorder}`
+                        border: `1px solid ${c.dialogBorder || c.cardBorder}`,
+                        backgroundImage: 'none',
                     }
                 }}
             >
