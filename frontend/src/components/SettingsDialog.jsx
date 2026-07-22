@@ -872,7 +872,7 @@ const SettingsDialog = ({ open, onClose }) => {
 
                                                  <Button
                                                      size="small"
-                                                     onClick={() => handleCartoonize()}
+                                                     onClick={() => setCartoonizeDialogOpen(true)}
                                                      disabled={cartoonizing || fetchingBaknusAvatar}
                                                      startIcon={cartoonizing ? <CircularProgress size={12} /> : <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fdd663' }} />}
                                                      sx={{
