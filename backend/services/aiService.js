@@ -110,6 +110,89 @@ async function getValidationStatus(jobId) {
     return res.data;
 }
 
+/**
+ * Validasi foto profil menggunakan AI Online (Gemini 2.5 Flash via Aivene API)
+ */
+async function validatePhotoOnline(base64Image) {
+    const apiKey = process.env.API_ONLINE || process.env.AIVENE_API_KEY;
+    if (!apiKey) {
+        throw new Error('API Key Online (API_ONLINE) belum dikonfigurasi di server.');
+    }
+
+    let dataUri = base64Image;
+    if (!dataUri.startsWith('data:')) {
+        dataUri = `data:image/jpeg;base64,${base64Image}`;
+    }
+
+    const promptText = `Analisis foto ini untuk foto profil pengguna. Pastikan foto memenuhi 4 kriteria utama berikut:
+1. Foto harus memperlihatkan 1 orang manusia (sendiri).
+2. Orang dalam foto TIDAK sedang MEROKOK.
+3. TIDAK ADA unsur pornografi, keseksian berlebihan, atau konten vulgar (NSFW).
+4. TIDAK MENGACUNGKAN JARI TENGAH atau gestur tangan/simbol yang kasar dan tidak sopan.
+
+Kembalikan balasan HANYA dalam bentuk JSON murni tanpa format markdown tambahan (tanpa \`\`\`json) dengan format:
+{"approved": true, "reason": "Foto profil memenuhi syarat."}
+atau jika menolak:
+{"approved": false, "reason": "Jelaskan alasan penolakan secara mendetail (misal: Terdeteksi lebih dari 1 orang / Terdeteksi merokok / Terdeteksi gestur jari tengah)"}`;
+
+    console.log('[aiService] Mengirim gambar ke AI Online (Gemini 2.5 Flash)...');
+    
+    try {
+        const response = await axios.post(
+            'https://api.aivene.com/v1/chat/completions',
+            {
+                model: 'gemini-2.5-flash',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: promptText },
+                            {
+                                type: 'image_url',
+                                image_url: { url: dataUri }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                timeout: 45000
+            }
+        );
+
+        const replyContent = response.data?.choices?.[0]?.message?.content || '';
+        let cleanJsonString = replyContent.trim();
+        if (cleanJsonString.startsWith('```')) {
+            cleanJsonString = cleanJsonString.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        }
+
+        let parsedResult;
+        try {
+            parsedResult = JSON.parse(cleanJsonString);
+        } catch (e) {
+            console.error('[aiService] Gagal parse JSON AI Online:', replyContent);
+            const lower = replyContent.toLowerCase();
+            if (lower.includes('"approved": true') || lower.includes('"approved":true')) {
+                parsedResult = { approved: true, reason: 'Foto profil disetujui.' };
+            } else {
+                parsedResult = { approved: false, reason: replyContent || 'Foto tidak memenuhi ketentuan.' };
+            }
+        }
+
+        return {
+            status: 'done',
+            result: parsedResult
+        };
+    } catch (error) {
+        console.error('[aiService] Error validasi AI Online:', error.response?.data || error.message);
+        throw new Error(error.response?.data?.error?.message || error.message || 'Gagal memproses validasi dengan AI Online.');
+    }
+}
+
 
 module.exports = {
     submitCartoonize,
@@ -117,4 +200,6 @@ module.exports = {
     downloadCartoonizeImage,
     submitValidation,
     getValidationStatus,
+    validatePhotoOnline,
 };
+

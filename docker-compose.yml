@@ -38,6 +38,7 @@ services:
       - MAILCOW_API_KEY=${MAILCOW_API_KEY}
       - DEEPAI_API_KEY=${DEEPAI_API_KEY:-}
       - FONNTE_TOKEN=${FONNTE_TOKEN}
+      - API_ONLINE=${API_ONLINE}
     depends_on:
       - db
     ports:

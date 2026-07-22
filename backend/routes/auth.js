@@ -504,16 +504,23 @@ router.post('/avatar/cartoonize/image', authMiddleware, async (req, res) => {
         res.status(500).json({ error: error.message || 'Gagal mengunduh gambar hasil animasi.' });
     }
 });
-// Photo Validation - Step 1: Submit to Validation API
+// Photo Validation - Step 1: Submit to Validation API (Local or Online)
 router.post('/avatar/validate', authMiddleware, async (req, res) => {
     try {
-        const { photo } = req.body;
+        const { photo, mode = 'local' } = req.body;
         if (!photo) {
             return res.status(400).json({ error: 'Foto diperlukan' });
         }
         
-        const result = await aiService.submitValidation(photo, req.user.id);
-        res.json(result);
+        if (mode === 'online') {
+            console.log('[auth] Memproses validasi foto menggunakan AI Online...');
+            const result = await aiService.validatePhotoOnline(photo);
+            return res.json(result);
+        } else {
+            console.log('[auth] Memproses validasi foto menggunakan AI Lokal...');
+            const result = await aiService.submitValidation(photo, req.user.id);
+            return res.json(result);
+        }
     } catch (error) {
         console.error('Error submitting validation job:', error);
         if (error.response?.status === 429) {

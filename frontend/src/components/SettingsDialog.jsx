@@ -24,7 +24,9 @@ import {
     VisibilityOff as VisibilityOffIcon,
     AccessTime as AccessTimeIcon,
     AutoAwesome as AutoAwesomeIcon,
-    ZoomIn as ZoomInIcon
+    ZoomIn as ZoomInIcon,
+    Dns as LocalIcon,
+    CloudQueue as CloudIcon
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { aliasAPI, authAPI } from '../api';
@@ -144,6 +146,7 @@ const SettingsDialog = ({ open, onClose }) => {
     const [toastMessage, setToastMessage] = useState('');
     const [sessionDuration, setSessionDuration] = useState(7);
     const [savingSession, setSavingSession] = useState(false);
+    const [aiMode, setAiMode] = useState('local'); // 'local' atau 'online'
 
     const {
         isValidating,
@@ -321,7 +324,7 @@ const SettingsDialog = ({ open, onClose }) => {
             }
             
             // Validasi foto profil
-            const validationResult = await validatePhoto(fileToValidate, user?.id || user?._id);
+            const validationResult = await validatePhoto(fileToValidate, user?.id || user?._id, aiMode);
             
             if (validationResult && validationResult.success) {
                 // Terapkan avatar jika validasi disetujui
@@ -889,6 +892,41 @@ const SettingsDialog = ({ open, onClose }) => {
                                     </Box>
                                 </Box>
                             </Box>
+
+                            {/* Opsi Verifikasi AI Foto Profil */}
+                            <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px dashed ${c.cardBorder}` }}>
+                                <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 1, color: 'text.secondary' }}>
+                                    Metode Verifikasi AI Foto Profil:
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Chip
+                                        icon={<LocalIcon sx={{ fontSize: '16px !important' }} />}
+                                        label="AI Lokal (Server)"
+                                        clickable
+                                        color={aiMode === 'local' ? 'primary' : 'default'}
+                                        variant={aiMode === 'local' ? 'filled' : 'outlined'}
+                                        onClick={() => setAiMode('local')}
+                                        size="small"
+                                        sx={{ fontWeight: 500 }}
+                                    />
+                                    <Chip
+                                        icon={<CloudIcon sx={{ fontSize: '16px !important' }} />}
+                                        label="AI Online (Gemini Flash)"
+                                        clickable
+                                        color={aiMode === 'online' ? 'primary' : 'default'}
+                                        variant={aiMode === 'online' ? 'filled' : 'outlined'}
+                                        onClick={() => setAiMode('online')}
+                                        size="small"
+                                        sx={{ fontWeight: 500 }}
+                                    />
+                                </Box>
+                                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.8, fontSize: '0.7rem' }}>
+                                    {aiMode === 'local' 
+                                        ? '⚡ Diproses oleh server AI internal lokal.' 
+                                        : '🌐 Diproses oleh Cloud AI (Cek 1 orang, tidak merokok, no NSFW, & no gestur jari tengah).'}
+                                </Typography>
+                            </Box>
+                        </Box>
 
                             {/* Display Name */}
                             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>

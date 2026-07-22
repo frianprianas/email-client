@@ -8,7 +8,7 @@ export const usePhotoValidation = () => {
     const pollIntervalRef = useRef(null);
     const pollCountRef = useRef(0);
 
-    const validatePhoto = useCallback(async (file, userId) => {
+    const validatePhoto = useCallback(async (file, userId, mode = 'local') => {
         setIsValidating(true);
         setValidationError('');
         setValidationSuccess('');
@@ -21,19 +21,38 @@ export const usePhotoValidation = () => {
                 try {
                     const base64Photo = reader.result;
                     
-                    console.log('[usePhotoValidation] Mengirim foto ke proxy backend...');
+                    console.log(`[usePhotoValidation] Mengirim foto ke proxy backend (mode: ${mode})...`);
 
                     // Step 1: Upload Foto via Backend Proxy
                     const response = await api.post(`/auth/avatar/validate`, {
-                        photo: base64Photo
+                        photo: base64Photo,
+                        mode: mode
                     });
 
-                    // Periksa jika server mengembalikan success: false
+                    // Jika mode online atau server langsung mengembalikan status 'done'
+                    if (response.data && response.data.status === 'done') {
+                        setIsValidating(false);
+                        let parsedResult = typeof response.data.result === 'string'
+                            ? JSON.parse(response.data.result)
+                            : response.data.result;
+
+                        if (parsedResult && parsedResult.approved === true) {
+                            setValidationSuccess('Foto berhasil diverifikasi (AI Online).');
+                            resolve({ success: true, result: parsedResult });
+                        } else {
+                            const reason = parsedResult?.reason || 'Foto tidak memenuhi ketentuan. Silakan gunakan foto lain.';
+                            setValidationError(reason);
+                            resolve({ success: false, reason });
+                        }
+                        return;
+                    }
+
+                    // Periksa jika server mengembalikan success: false untuk polling lokal
                     if (!response.data || (!response.data.success && !response.data.job_id)) {
                         throw new Error('Gagal mengirim foto untuk validasi.');
                     }
 
-                const jobId = response.data.job_id;
+                    const jobId = response.data.job_id;
 
                 // Step 2 & 3: Polling Status
                 const poll = async () => {
