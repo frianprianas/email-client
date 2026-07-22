@@ -104,6 +104,7 @@ const SettingsDialog = ({ open, onClose }) => {
     const { user, updateUser } = useAuth();
     const theme = useTheme();
     const c = theme.palette.custom;
+    const isDark = theme.palette.mode === 'dark';
     const [aliases, setAliases] = useState([]);
     const [newAlias, setNewAlias] = useState('');
     const [loading, setLoading] = useState(false);
