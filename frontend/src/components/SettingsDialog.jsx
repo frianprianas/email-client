@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
 import {
-    Dialog, DialogTitle, DialogContent, Box, Typography,
-    TextField, Button, IconButton, CircularProgress, Alert,
+    Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography,
+    TextField, Button, IconButton, CircularProgress, Alert, Paper, Radio,
     Divider, Chip, Tooltip, InputAdornment, Avatar, Snackbar
 } from '@mui/material';
 import {
@@ -148,6 +147,13 @@ const SettingsDialog = ({ open, onClose }) => {
     const [savingSession, setSavingSession] = useState(false);
     const [aiMode, setAiMode] = useState('local'); // 'local' atau 'online'
 
+    // Verification Modal State
+    const [selectedFileForValidation, setSelectedFileForValidation] = useState(null);
+    const [filePreviewUrl, setFilePreviewUrl] = useState('');
+    const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+    const [modalError, setModalError] = useState('');
+    const [validatingInModal, setValidatingInModal] = useState(false);
+
     const {
         isValidating,
         validationError,
@@ -293,7 +299,7 @@ const SettingsDialog = ({ open, onClose }) => {
         return colors[index];
     };
 
-    const handleAvatarUpload = async (e) => {
+    const handleAvatarUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -305,41 +311,54 @@ const SettingsDialog = ({ open, onClose }) => {
 
         setError('');
         setSuccess('');
-        setSavingProfile(true);
+        setModalError('');
+
+        const previewUrl = URL.createObjectURL(file);
+        setSelectedFileForValidation(file);
+        setFilePreviewUrl(previewUrl);
+        setVerifyDialogOpen(true);
+
+        e.target.value = '';
+    };
+
+    const handleConfirmVerification = async () => {
+        if (!selectedFileForValidation) return;
+
+        setValidatingInModal(true);
+        setModalError('');
 
         try {
-            let fileToValidate = file;
+            let fileToValidate = selectedFileForValidation;
             let avatarBase64ToUpload = null;
 
-            // Jika ukuran file lebih dari 2MB, kompres/resize otomatis terlebih dahulu
-            if (file.size > 2 * 1024 * 1024) {
-                const { compressedFile, avatarBase64 } = await processImageOnTheFly(file);
+            if (selectedFileForValidation.size > 2 * 1024 * 1024) {
+                const { compressedFile, avatarBase64 } = await processImageOnTheFly(selectedFileForValidation);
                 fileToValidate = compressedFile;
                 avatarBase64ToUpload = avatarBase64;
             } else {
-                // Jika di bawah atau sama dengan 2MB, gunakan file asli untuk validasi
-                // Namun tetap buat avatarBase64 128x128 untuk penyimpanan profil
-                const { avatarBase64 } = await processImageOnTheFly(file);
+                const { avatarBase64 } = await processImageOnTheFly(selectedFileForValidation);
                 avatarBase64ToUpload = avatarBase64;
             }
-            
-            // Validasi foto profil
+
             const validationResult = await validatePhoto(fileToValidate, user?.id || user?._id, aiMode);
-            
+
             if (validationResult && validationResult.success) {
-                // Terapkan avatar jika validasi disetujui
                 const res = await authAPI.updateProfile({ avatar: avatarBase64ToUpload });
                 updateUser(res.data.user);
-                setSuccess('Avatar updated!');
+                setSuccess('Foto profil berhasil diverifikasi dan diperbarui!');
+                setVerifyDialogOpen(false);
+                setSelectedFileForValidation(null);
+                setFilePreviewUrl('');
+            } else {
+                setModalError(validationResult?.reason || 'Foto tidak memenuhi ketentuan. Silakan gunakan foto lain.');
             }
         } catch (err) {
-            console.error('Error handling avatar upload:', err);
+            console.error('Error during photo verification:', err);
             if (err.message && err.message !== 'timeout' && err.message !== 'parse_error') {
-                setError(err.response?.data?.error || err.message || 'Failed to process avatar');
+                setModalError(err.response?.data?.error || err.message || 'Gagal memproses validasi foto.');
             }
         } finally {
-            setSavingProfile(false);
-            e.target.value = '';
+            setValidatingInModal(false);
         }
     };
 
@@ -894,9 +913,9 @@ const SettingsDialog = ({ open, onClose }) => {
                             </Box>
 
                             {/* Opsi Verifikasi AI Foto Profil */}
-                            <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px dashed ${c.cardBorder}` }}>
+                            <Box sx={{ mt: 2, mb: 2.5, pt: 1.5, borderTop: `1px dashed ${c.cardBorder}` }}>
                                 <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 1, color: 'text.secondary' }}>
-                                    Metode Verifikasi AI Foto Profil:
+                                    Metode Verifikasi AI Foto Profil Default:
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <Chip
@@ -926,7 +945,6 @@ const SettingsDialog = ({ open, onClose }) => {
                                         : '🌐 Diproses oleh Cloud AI (Cek 1 orang, tidak merokok, no NSFW, & no gestur jari tengah).'}
                                 </Typography>
                             </Box>
-                        </Box>
 
                             {/* Display Name */}
                             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
@@ -949,22 +967,18 @@ const SettingsDialog = ({ open, onClose }) => {
                                     size="small"
                                     sx={{
                                         borderRadius: 2,
-                                        px: 2,
-                                        minHeight: 40,
-                                        background: c.btnGradient,
-                                        '&:hover': {
-                                            background: c.btnHoverGradient,
-                                        },
+                                        px: 2.5,
+                                        py: 1,
+                                        bgcolor: c.accent,
+                                        '&:hover': { bgcolor: c.accentHover },
                                         textTransform: 'none',
-                                        fontWeight: 500,
-                                        whiteSpace: 'nowrap',
+                                        fontWeight: 600,
                                     }}
                                 >
                                     Save
                                 </Button>
                             </Box>
                         </Box>
-                    </Box>
 
                     <Divider sx={{ mb: 3 }} />
 
@@ -1624,6 +1638,146 @@ const SettingsDialog = ({ open, onClose }) => {
                         </Box>
                     )}
                 </DialogContent>
+            </Dialog>
+
+            {/* Modal Verifikasi Foto & Pemilihan AI */}
+            <Dialog
+                open={verifyDialogOpen}
+                onClose={() => !validatingInModal && setVerifyDialogOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        bgcolor: c.cardBg,
+                        color: 'text.primary',
+                        border: `1px solid ${c.cardBorder}`
+                    }
+                }}
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                        Verifikasi Foto Profil AI
+                    </Typography>
+                    <IconButton
+                        size="small"
+                        onClick={() => setVerifyDialogOpen(false)}
+                        disabled={validatingInModal}
+                    >
+                        <CloseIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent dividers sx={{ borderColor: c.cardBorder }}>
+                    {/* Preview Foto */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2.5 }}>
+                        <Avatar
+                            src={filePreviewUrl}
+                            sx={{ width: 90, height: 90, mb: 1, border: `2px solid ${c.accent}` }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                            Foto yang dipilih untuk diverifikasi
+                        </Typography>
+                    </Box>
+
+                    {/* Pilihan Provider AI */}
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                        Pilih Metode Verifikasi AI:
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2 }}>
+                        <Paper
+                            elevation={0}
+                            onClick={() => !validatingInModal && setAiMode('local')}
+                            sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                border: `2px solid ${aiMode === 'local' ? c.accent : c.cardBorder}`,
+                                bgcolor: aiMode === 'local' ? (isDark ? 'rgba(138, 180, 248, 0.08)' : 'rgba(25, 118, 210, 0.04)') : 'transparent',
+                                cursor: validatingInModal ? 'default' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <LocalIcon color={aiMode === 'local' ? 'primary' : 'action'} />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    AI Lokal (Server Internal)
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Antrean pemrosesan oleh server AI lokal.
+                                </Typography>
+                            </Box>
+                            <Radio checked={aiMode === 'local'} size="small" />
+                        </Paper>
+
+                        <Paper
+                            elevation={0}
+                            onClick={() => !validatingInModal && setAiMode('online')}
+                            sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                border: `2px solid ${aiMode === 'online' ? c.accent : c.cardBorder}`,
+                                bgcolor: aiMode === 'online' ? (isDark ? 'rgba(138, 180, 248, 0.08)' : 'rgba(25, 118, 210, 0.04)') : 'transparent',
+                                cursor: validatingInModal ? 'default' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <CloudIcon color={aiMode === 'online' ? 'primary' : 'action'} />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    AI Online (Gemini 2.5 Flash)
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Cepat. Cek foto 1 orang, tidak merokok, no NSFW, & no gestur jari tengah.
+                                </Typography>
+                            </Box>
+                            <Radio checked={aiMode === 'online'} size="small" />
+                        </Paper>
+                    </Box>
+
+                    {modalError && (
+                        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                            {modalError}
+                        </Alert>
+                    )}
+
+                    {validatingInModal && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 2, bgcolor: isDark ? '#2a2b2d' : '#f1f3f4' }}>
+                            <CircularProgress size={20} />
+                            <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                {aiMode === 'online' ? 'Sedang memverifikasi dengan Gemini Cloud AI...' : 'Sedang mengirim ke server AI lokal...'}
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button
+                        onClick={() => setVerifyDialogOpen(false)}
+                        disabled={validatingInModal}
+                        color="inherit"
+                        size="small"
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Batal
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmVerification}
+                        disabled={validatingInModal}
+                        size="small"
+                        startIcon={validatingInModal ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
+                        sx={{ textTransform: 'none', bgcolor: c.accent, '&:hover': { bgcolor: c.accentHover } }}
+                    >
+                        {validatingInModal ? 'Memproses...' : 'Proses Verifikasi'}
+                    </Button>
+                </DialogActions>
             </Dialog>
         </>
     );
