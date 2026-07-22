@@ -979,6 +979,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                 </Button>
                             </Box>
                         </Box>
+                    </Box>
 
                     <Divider sx={{ mb: 3 }} />
 
