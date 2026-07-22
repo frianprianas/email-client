@@ -439,13 +439,13 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Harap unggah foto profil terlebih dahulu sebelum menggunakan fitur animasi AI.' });
         }
 
-        // Batasan harian: maksimal 2 kali per hari
+        // Batasan harian: maksimal 4 kali per hari
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
         if (req.user.lastAiGenerationDate === todayStr) {
-            if (req.user.aiGenerationsToday >= 2) {
-                return res.status(400).json({ error: 'Batas harian tercapai. Anda hanya dapat menggunakan fitur Animasi AI ini maksimal 2 kali dalam sehari.' });
+            if (req.user.aiGenerationsToday >= 4) {
+                return res.status(400).json({ error: 'Batas harian tercapai. Anda hanya dapat menggunakan fitur Animasi AI ini maksimal 4 kali dalam sehari.' });
             }
         }
 
@@ -465,7 +465,7 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
             return res.json({
                 status: 'done',
                 imageDataUri: dataUri,
-                message: `Animasi online berhasil dibuat! (${newCount}/2 hari ini)`
+                message: `Animasi online berhasil dibuat! (${newCount}/4 hari ini)`
             });
         } else {
             console.log('[auth] Memproses animasi avatar menggunakan AI Lokal...');
@@ -483,7 +483,7 @@ router.post('/avatar/cartoonize', authMiddleware, async (req, res) => {
 
             return res.json({
                 jobId,
-                message: `Animasi sedang diproses... (${newCount}/2 hari ini)`
+                message: `Animasi sedang diproses... (${newCount}/4 hari ini)`
             });
         }
     } catch (error) {
