@@ -37,7 +37,7 @@ export const usePhotoValidation = () => {
                             : response.data.result;
 
                         if (parsedResult && parsedResult.approved === true) {
-                            setValidationSuccess('Foto berhasil diverifikasi (AI Online).');
+                            setValidationSuccess('Foto berhasil diverifikasi (BaknusAI Online).');
                             resolve({ success: true, result: parsedResult });
                         } else {
                             const reason = parsedResult?.reason || 'Foto tidak memenuhi ketentuan. Silakan gunakan foto lain.';
@@ -97,7 +97,7 @@ export const usePhotoValidation = () => {
                     } catch (err) {
                         setIsValidating(false);
                         const msg = err.response?.status === 429 
-                            ? 'Batas penggunaan harian telah tercapai. Anda telah mencapai batas 5 validasi per hari.' 
+                            ? (err.response.data?.error || err.response.data?.message || 'Batas penggunaan harian telah tercapai.') 
                             : 'Gagal mengecek status validasi.';
                         setValidationError(msg);
                         reject(err);
@@ -111,7 +111,7 @@ export const usePhotoValidation = () => {
                 setIsValidating(false);
                 let msg = 'Gagal mengirim foto ke server validasi.';
                 if (err.response?.status === 429) {
-                    msg = err.response.data?.message || 'Batas penggunaan harian telah tercapai.';
+                    msg = err.response.data?.error || err.response.data?.message || 'Batas penggunaan harian telah tercapai.';
                 }
                 setValidationError(msg);
                 reject(err);

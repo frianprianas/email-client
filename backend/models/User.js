@@ -59,6 +59,14 @@ const User = sequelize.define('User', {
     lastAiGenerationDate: {
         type: DataTypes.DATEONLY,
         allowNull: true
+    },
+    onlineAiValidationsToday: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    lastOnlineAiValidationDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
     }
 }, {
     tableName: 'users',

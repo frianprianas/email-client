@@ -513,11 +513,34 @@ router.post('/avatar/validate', authMiddleware, async (req, res) => {
         }
         
         if (mode === 'online') {
-            console.log('[auth] Memproses validasi foto menggunakan AI Online...');
+            // Batasan harian AI Online: maksimal 5 kali per hari
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+            if (req.user.lastOnlineAiValidationDate === todayStr) {
+                if (req.user.onlineAiValidationsToday >= 5) {
+                    return res.status(429).json({
+                        error: 'Batas harian tercapai. Anda hanya dapat menggunakan fitur BaknusAI Online maksimal 5 kali dalam sehari.'
+                    });
+                }
+            }
+
+            console.log('[auth] Memproses validasi foto menggunakan BaknusAI Online...');
             const result = await aiService.validatePhotoOnline(photo);
+
+            // Update counter limit
+            const newCount = (req.user.lastOnlineAiValidationDate === todayStr)
+                ? (req.user.onlineAiValidationsToday + 1)
+                : 1;
+
+            await req.user.update({
+                onlineAiValidationsToday: newCount,
+                lastOnlineAiValidationDate: todayStr
+            });
+
             return res.json(result);
         } else {
-            console.log('[auth] Memproses validasi foto menggunakan AI Lokal...');
+            console.log('[auth] Memproses validasi foto menggunakan Baknus AI Offline...');
             const result = await aiService.submitValidation(photo, req.user.id);
             return res.json(result);
         }

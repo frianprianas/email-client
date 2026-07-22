@@ -922,7 +922,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <Chip
                                         icon={<LocalIcon sx={{ fontSize: '16px !important' }} />}
-                                        label="AI Lokal (Server)"
+                                        label="Baknus AI offline"
                                         clickable
                                         color={aiMode === 'local' ? 'primary' : 'default'}
                                         variant={aiMode === 'local' ? 'filled' : 'outlined'}
@@ -932,7 +932,7 @@ const SettingsDialog = ({ open, onClose }) => {
                                     />
                                     <Chip
                                         icon={<CloudIcon sx={{ fontSize: '16px !important' }} />}
-                                        label="AI Online (Gemini Flash)"
+                                        label="BaknusAI online"
                                         clickable
                                         color={aiMode === 'online' ? 'primary' : 'default'}
                                         variant={aiMode === 'online' ? 'filled' : 'outlined'}
@@ -943,8 +943,8 @@ const SettingsDialog = ({ open, onClose }) => {
                                 </Box>
                                 <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.8, fontSize: '0.7rem' }}>
                                     {aiMode === 'local' 
-                                        ? '⚡ Diproses oleh server AI internal lokal.' 
-                                        : '🌐 Diproses oleh Cloud AI (Cek 1 orang, tidak merokok, no NSFW, & no gestur jari tengah).'}
+                                        ? '⚡ Diproses oleh Baknus AI offline internal.' 
+                                        : '🌐 Diproses oleh BaknusAI online (Cek 1 orang, tidak merokok, no NSFW, & no gestur jari tengah - Batasi 5x/hari).'}
                                 </Typography>
                             </Box>
 
@@ -1661,7 +1661,7 @@ const SettingsDialog = ({ open, onClose }) => {
             >
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
-                        Verifikasi Foto Profil AI
+                        Verifikasi Foto Profil BaknusAI
                     </Typography>
                     <IconButton
                         size="small"
@@ -1708,7 +1708,7 @@ const SettingsDialog = ({ open, onClose }) => {
                             <LocalIcon color={aiMode === 'local' ? 'primary' : 'action'} />
                             <Box sx={{ flex: 1 }}>
                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                    AI Lokal (Server Internal)
+                                    Baknus AI offline
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
                                     Antrean pemrosesan oleh server AI lokal.
@@ -1735,10 +1735,10 @@ const SettingsDialog = ({ open, onClose }) => {
                             <CloudIcon color={aiMode === 'online' ? 'primary' : 'action'} />
                             <Box sx={{ flex: 1 }}>
                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                    AI Online (Gemini 2.5 Flash)
+                                    BaknusAI online
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                    Cepat. Cek foto 1 orang, tidak merokok, no NSFW, & no gestur jari tengah.
+                                    Cepat. Cek foto 1 orang, tidak merokok, no NSFW, & no gestur jari tengah (Limit 5x/hari).
                                 </Typography>
                             </Box>
                             <Radio checked={aiMode === 'online'} size="small" />
@@ -1755,7 +1755,7 @@ const SettingsDialog = ({ open, onClose }) => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 2, bgcolor: isDark ? '#2a2b2d' : '#f1f3f4' }}>
                             <CircularProgress size={20} />
                             <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                                {aiMode === 'online' ? 'Sedang memverifikasi dengan Gemini Cloud AI...' : 'Sedang mengirim ke server AI lokal...'}
+                                {aiMode === 'online' ? 'Sedang memverifikasi dengan BaknusAI online...' : 'Sedang mengirim ke Baknus AI offline...'}
                             </Typography>
                         </Box>
                     )}
