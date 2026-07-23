@@ -128,6 +128,13 @@ const SettingsDialog = ({ open, onClose }) => {
     const [pollCount, setPollCount] = useState(0);
     const [zoomImage, setZoomImage] = useState(null);
     const avatarInputRef = useRef(null);
+    const cartoonizeTimeoutRef = useRef(null);
+    const clearCartoonize = () => {
+        if (cartoonizeTimeoutRef.current) {
+            clearTimeout(cartoonizeTimeoutRef.current);
+        }
+        setCartoonizing(false);
+    };
 
     // Phone state
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -166,6 +173,7 @@ const SettingsDialog = ({ open, onClose }) => {
         validationError,
         validationSuccess,
         validatePhoto,
+        clearValidation,
         setValidationError,
         setValidationSuccess
     } = usePhotoValidation();
@@ -441,7 +449,7 @@ const SettingsDialog = ({ open, onClose }) => {
                     console.log('[poll] Status response:', statusData);
                 } catch (pollErr) {
                     console.warn('[poll] Error mengecek status, coba lagi...', pollErr.message);
-                    setTimeout(poll, 6000);
+                    cartoonizeTimeoutRef.current = setTimeout(poll, 6000);
                     return;
                 }
 
@@ -464,28 +472,28 @@ const SettingsDialog = ({ open, onClose }) => {
                         } catch (dlErr) {
                             console.warn('[download] Gagal download gambar:', dlErr.message);
                             if (retries > 0) {
-                                                        setTimeout(() => downloadWithRetry(retries - 1, delay + 2000), delay);
-                                                    } else {
-                                                        setError('Gagal mengunduh gambar hasil animasi. Coba lagi.');
-                                                        setCartoonizing(false);
-                                                    }
-                                                }
-                                            };
-                                            downloadWithRetry();
-                                        } else {
-                                            // Masih processing
-                                            setTimeout(poll, 5000);
-                                        }
-                                    };
+                                cartoonizeTimeoutRef.current = setTimeout(() => downloadWithRetry(retries - 1, delay + 2000), delay);
+                            } else {
+                                setError('Gagal mengunduh gambar hasil animasi. Coba lagi.');
+                                setCartoonizing(false);
+                            }
+                        }
+                    };
+                    downloadWithRetry();
+                } else {
+                    // Masih processing
+                    cartoonizeTimeoutRef.current = setTimeout(poll, 5000);
+                }
+            };
 
-                                    setTimeout(poll, 5000); // mulai polling setelah 5 detik pertama
+            cartoonizeTimeoutRef.current = setTimeout(poll, 5000); // mulai polling setelah 5 detik pertama
 
-                                } catch (err) {
-                                    console.error('[cartoonize] Error submit:', err);
-                                    setError(err.response?.data?.error || 'Gagal mengirim foto ke server animasi AI');
-                                    setCartoonizing(false);
-                                }
-                            };
+        } catch (err) {
+            console.error('[cartoonize] Error submit:', err);
+            setError(err.response?.data?.error || 'Gagal mengirim foto ke server animasi AI');
+            setCartoonizing(false);
+        }
+    };
 
     const handleApplyPreview = async () => {
         if (!previewAvatar) return;
@@ -1656,10 +1664,14 @@ const SettingsDialog = ({ open, onClose }) => {
                 </DialogContent>
             </Dialog>
 
-            {/* Modal Verifikasi Foto & Pemilihan AI */}
             <Dialog
                 open={verifyDialogOpen}
-                onClose={() => !validatingInModal && setVerifyDialogOpen(false)}
+                onClose={() => {
+                    if (!validatingInModal) {
+                        setVerifyDialogOpen(false);
+                        clearValidation();
+                    }
+                }}
                 maxWidth="xs"
                 fullWidth
                 PaperProps={{
@@ -1678,7 +1690,10 @@ const SettingsDialog = ({ open, onClose }) => {
                     </Typography>
                     <IconButton
                         size="small"
-                        onClick={() => setVerifyDialogOpen(false)}
+                        onClick={() => {
+                            setVerifyDialogOpen(false);
+                            clearValidation();
+                        }}
                         disabled={validatingInModal}
                     >
                         <CloseIcon sx={{ fontSize: 18 }} />
@@ -1776,7 +1791,10 @@ const SettingsDialog = ({ open, onClose }) => {
 
                 <DialogActions sx={{ p: 2, gap: 1 }}>
                     <Button
-                        onClick={() => setVerifyDialogOpen(false)}
+                        onClick={() => {
+                            setVerifyDialogOpen(false);
+                            clearValidation();
+                        }}
                         disabled={validatingInModal}
                         color="inherit"
                         size="small"
@@ -1800,7 +1818,12 @@ const SettingsDialog = ({ open, onClose }) => {
             {/* Modal Dialog Animasi AI (Cartoonize) */}
             <Dialog
                 open={cartoonizeDialogOpen}
-                onClose={() => !cartoonizing && setCartoonizeDialogOpen(false)}
+                onClose={() => {
+                    if (!cartoonizing) {
+                        setCartoonizeDialogOpen(false);
+                        clearCartoonize();
+                    }
+                }}
                 maxWidth="xs"
                 fullWidth
                 PaperProps={{
@@ -1819,7 +1842,10 @@ const SettingsDialog = ({ open, onClose }) => {
                     </Typography>
                     <IconButton
                         size="small"
-                        onClick={() => setCartoonizeDialogOpen(false)}
+                        onClick={() => {
+                            setCartoonizeDialogOpen(false);
+                            clearCartoonize();
+                        }}
                         disabled={cartoonizing}
                     >
                         <CloseIcon sx={{ fontSize: 18 }} />
@@ -1927,7 +1953,10 @@ const SettingsDialog = ({ open, onClose }) => {
 
                 <DialogActions sx={{ p: 2, gap: 1 }}>
                     <Button
-                        onClick={() => setCartoonizeDialogOpen(false)}
+                        onClick={() => {
+                            setCartoonizeDialogOpen(false);
+                            clearCartoonize();
+                        }}
                         disabled={cartoonizing}
                         color="inherit"
                         size="small"

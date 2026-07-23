@@ -90,6 +90,11 @@ export const usePhotoValidation = () => {
                                 setValidationError(reason);
                                 resolve({ success: false, reason });
                             }
+                        } else if (statusData.status === 'failed' || statusData.status === 'error') {
+                            setIsValidating(false);
+                            const reason = statusData.reason || statusData.error || 'Server AI gagal memproses validasi foto.';
+                            setValidationError(reason);
+                            resolve({ success: false, reason });
                         } else {
                             // queued or processing -> wait 5 seconds and poll again
                             pollIntervalRef.current = setTimeout(poll, 5000);
