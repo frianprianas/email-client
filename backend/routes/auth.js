@@ -388,7 +388,7 @@ router.get('/avatar/:email', async (req, res) => {
         // Set header HTTP
         res.set('Content-Type', imageType);
         res.set('Content-Length', imageBuffer.length);
-        res.set('Cache-Control', 'public, max-age=86400'); // Cache di memori browser selama 1 hari
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.set('Access-Control-Allow-Origin', '*');
 
         // Kirim gambar

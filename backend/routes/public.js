@@ -36,7 +36,7 @@ router.get('/avatar/:email', async (req, res) => {
         // Set HTTP headers for image rendering and caching
         res.set('Content-Type', imageType);
         res.set('Content-Length', imageBuffer.length);
-        res.set('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.set('Access-Control-Allow-Origin', '*'); // Ensure other apps can fetch it
 
         res.send(imageBuffer);
