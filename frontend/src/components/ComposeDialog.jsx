@@ -322,7 +322,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
-        const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+        const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
         files.forEach(file => {
             if (file.size > MAX_SIZE) {
@@ -972,7 +972,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                         File Terlalu Besar
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.6 }}>
-                        File <strong>{largeFileName}</strong> melebihi batas lampiran 2 MB. 
+                        File <strong>{largeFileName}</strong> melebihi batas lampiran 5 MB. 
                         Silakan gunakan <strong>BaknusDrive</strong> untuk mengunggah file besar, lalu bagikan linknya.
                     </Typography>
                     
