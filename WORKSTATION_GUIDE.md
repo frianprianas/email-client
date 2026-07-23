@@ -168,6 +168,9 @@ server {
     listen 443 ssl;
     server_name baknusmail.smkbn666.sch.id;
 
+    # Batas ukuran payload request (agar file upload/attachment besar tidak error 413)
+    client_max_body_size 50M;
+
     # Konfigurasi Sertifikat SSL Let's Encrypt
     ssl_certificate /etc/letsencrypt/live/baknusmail.smkbn666.sch.id/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/baknusmail.smkbn666.sch.id/privkey.pem;
