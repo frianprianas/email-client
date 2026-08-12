@@ -627,6 +627,63 @@ class ImapService {
         }
         return false;
     }
+
+    async getUnseenMessages() {
+        try {
+            await this.connect();
+            const imapFolder = 'INBOX';
+            const lock = await this.client.getMailboxLock(imapFolder);
+
+            try {
+                const uids = await this.client.search({ unseen: true });
+                if (!uids || uids.length === 0) {
+                    return [];
+                }
+
+                const messages = [];
+                const parseAddr = (a) => {
+                    const address = (a.mailbox && a.host)
+                        ? `${a.mailbox}@${a.host}`
+                        : (a.address || a.mailbox || '');
+                    return { name: a.name || '', address };
+                };
+
+                for (const uid of uids) {
+                    for await (const msg of this.client.fetch({ uid }, {
+                        uid: true,
+                        flags: true,
+                        envelope: true
+                    })) {
+                        if (msg.flags.has('\\Deleted')) {
+                            continue;
+                        }
+                        const envelope = msg.envelope;
+                        const fromArr = envelope.from ? envelope.from.map(parseAddr) : [];
+                        const fromStr = fromArr.length > 0 
+                            ? (fromArr[0].name ? `${fromArr[0].name} <${fromArr[0].address}>` : fromArr[0].address) 
+                            : 'Unknown Sender';
+                        
+                        messages.push({
+                            uid: msg.uid,
+                            messageId: envelope.messageId,
+                            subject: envelope.subject || '(No Subject)',
+                            from: fromStr,
+                            to: this.email,
+                            date: envelope.date
+                        });
+                    }
+                }
+
+                return messages;
+            } finally {
+                lock.release();
+            }
+        } catch (error) {
+            throw error;
+        } finally {
+            await this.disconnect();
+        }
+    }
 }
 
 module.exports = ImapService;
