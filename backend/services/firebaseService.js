@@ -45,41 +45,80 @@ async function sendEmailNotification(to, from, subject) {
   console.log(`Searching FCM token for recipient: ${userEmail}`);
 
   try {
-    // 1. Fetch the document from firestore collection 'user_tokens' with ID = userEmail
-    const docRef = db.collection('user_tokens').doc(userEmail);
+    // 1. Ambil dokumen dari Firestore 'user_tokens'
+    const docRef = db.collection('user_tokens').doc(userEmail); 
     const doc = await docRef.get();
-
+    
     if (!doc.exists) {
-      console.log(`No FCM token document found in 'user_tokens' for email: ${userEmail}`);
+      console.log(`Token tidak ditemukan untuk ${userEmail}`);
       return { success: false, reason: 'Token not found in Firestore for this recipient' };
     }
-
-    const data = doc.data();
-    const fcmToken = data.fcm_token;
-
+    
+    const fcmToken = doc.data().fcm_token;
     if (!fcmToken) {
       console.log(`fcm_token field is empty for user: ${userEmail}`);
       return { success: false, reason: 'fcm_token field is missing or empty' };
     }
 
-    // 2. Prepare the notification payload
+    // 2. Tentukan channel_id & sound berdasarkan pengirim / subjek email
+    const lowerFrom = (from || "").toLowerCase();
+    const lowerSubject = (subject || "").toLowerCase();
+    let channelId = "channel_email_umum_v3";
+    let soundName = "sound_umum";
+    if (
+      lowerFrom.includes("attend") ||
+      lowerFrom.includes("presensi") ||
+      lowerSubject.includes("baknusattend") ||
+      lowerSubject.includes("attend") ||
+      lowerSubject.includes("presensi") ||
+      lowerSubject.includes("kehadiran")
+    ) {
+      channelId = "channel_baknus_attend_v3";
+      soundName = "sound_baknus_attend";
+    } else if (
+      lowerFrom.includes("drive") ||
+      lowerSubject.includes("baknusdrive") ||
+      lowerSubject.includes("drive") ||
+      lowerSubject.includes("berkas") ||
+      lowerSubject.includes("penyimpanan")
+    ) {
+      channelId = "channel_baknus_drive_v3";
+      soundName = "sound_baknus_drive";
+    } else if (
+      lowerFrom.includes("talim") ||
+      lowerFrom.includes("ta'lim") ||
+      lowerSubject.includes("baknustalim") ||
+      lowerSubject.includes("talim") ||
+      lowerSubject.includes("ta'lim") ||
+      lowerSubject.includes("kajian")
+    ) {
+      channelId = "channel_baknus_talim_v3";
+      soundName = "sound_baknus_talim";
+    }
+
+    // 3. Buat & kirim payload FCM Push Notification (DATA ONLY)
     const message = {
-      notification: {
-        title: `Email Baru dari ${from}`,
-        body: subject
+      android: {
+        priority: "high",
+        collapseKey: "baknus_email_latest"
       },
       data: {
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+        route: "/home",
         email_to: to,
         email_from: from,
-        subject: subject
+        subject: subject,
+        notif_title: "Email Baru",
+        notif_body: "Anda mendapatkan pesan baru",
+        channel_id: channelId,
+        sound_name: soundName
       },
       token: fcmToken
     };
 
-    // 3. Send message using FCM
-    console.log(`Sending FCM notification to token: ${fcmToken}`);
+    console.log(`Sending FCM data-only notification to token: ${fcmToken} (channel: ${channelId}, sound: ${soundName})`);
     const response = await messaging.send(message);
-    console.log('Successfully sent message:', response);
+    console.log('Successfully sent FCM data-only message:', response);
 
     return { success: true, messageId: response };
   } catch (error) {
