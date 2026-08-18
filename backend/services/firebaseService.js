@@ -54,13 +54,23 @@ async function sendEmailNotification(to, from, subject) {
       return { success: false, reason: 'Token not found in Firestore for this recipient' };
     }
     
-    const fcmToken = doc.data().fcm_token;
-    if (!fcmToken) {
-      console.log(`fcm_token field is empty for user: ${userEmail}`);
-      return { success: false, reason: 'fcm_token field is missing or empty' };
+    const userData = doc.data() || {};
+    
+    // 2. Ambil daftar array fcm_tokens (atau fallback ke fcm_token tunggal jika lama)
+    let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
+    if (tokens.length === 0 && userData.fcm_token) {
+      tokens = [userData.fcm_token];
     }
 
-    // 2. Buat & kirim payload FCM Push Notification (DATA ONLY - Notifikasi Universal)
+    // Filter token kosong & hapus duplikat
+    tokens = Array.from(new Set(tokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
+
+    if (tokens.length === 0) {
+      console.log(`Tidak ada token FCM valid untuk user: ${userEmail}`);
+      return { success: false, reason: 'No valid FCM tokens found for recipient' };
+    }
+
+    // 3. Buat & kirim payload FCM Multicast Push Notification (DATA ONLY)
     const message = {
       android: {
         priority: "high",
@@ -77,14 +87,19 @@ async function sendEmailNotification(to, from, subject) {
         channel_id: "channel_email_umum_v3",
         sound_name: "sound_umum"
       },
-      token: fcmToken
+      tokens: tokens
     };
 
-    console.log(`Sending universal FCM data-only notification to token: ${fcmToken} (channel: channel_email_umum_v3, sound: sound_umum)`);
-    const response = await messaging.send(message);
-    console.log('Successfully sent FCM data-only message:', response);
+    console.log(`Sending multicast FCM data-only notification to ${tokens.length} device(s) for ${userEmail}`);
+    const response = await messaging.sendEachForMulticast(message);
+    console.log(`Successfully processed multicast FCM message: ${response.successCount} succeeded, ${response.failureCount} failed.`);
 
-    return { success: true, messageId: response };
+    return { 
+      success: true, 
+      successCount: response.successCount, 
+      failureCount: response.failureCount,
+      responses: response.responses
+    };
   } catch (error) {
     console.error('Error sending push notification:', error);
     throw new Error(`Failed to send push notification: ${error.message}`);
