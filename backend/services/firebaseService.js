@@ -60,43 +60,7 @@ async function sendEmailNotification(to, from, subject) {
       return { success: false, reason: 'fcm_token field is missing or empty' };
     }
 
-    // 2. Tentukan channel_id & sound berdasarkan pengirim / subjek email
-    const lowerFrom = (from || "").toLowerCase();
-    const lowerSubject = (subject || "").toLowerCase();
-    let channelId = "channel_email_umum_v3";
-    let soundName = "sound_umum";
-    if (
-      lowerFrom.includes("attend") ||
-      lowerFrom.includes("presensi") ||
-      lowerSubject.includes("baknusattend") ||
-      lowerSubject.includes("attend") ||
-      lowerSubject.includes("presensi") ||
-      lowerSubject.includes("kehadiran")
-    ) {
-      channelId = "channel_baknus_attend_v3";
-      soundName = "sound_baknus_attend";
-    } else if (
-      lowerFrom.includes("drive") ||
-      lowerSubject.includes("baknusdrive") ||
-      lowerSubject.includes("drive") ||
-      lowerSubject.includes("berkas") ||
-      lowerSubject.includes("penyimpanan")
-    ) {
-      channelId = "channel_baknus_drive_v3";
-      soundName = "sound_baknus_drive";
-    } else if (
-      lowerFrom.includes("talim") ||
-      lowerFrom.includes("ta'lim") ||
-      lowerSubject.includes("baknustalim") ||
-      lowerSubject.includes("talim") ||
-      lowerSubject.includes("ta'lim") ||
-      lowerSubject.includes("kajian")
-    ) {
-      channelId = "channel_baknus_talim_v3";
-      soundName = "sound_baknus_talim";
-    }
-
-    // 3. Buat & kirim payload FCM Push Notification (DATA ONLY)
+    // 2. Buat & kirim payload FCM Push Notification (DATA ONLY - Notifikasi Universal)
     const message = {
       android: {
         priority: "high",
@@ -108,15 +72,15 @@ async function sendEmailNotification(to, from, subject) {
         email_to: to,
         email_from: from,
         subject: subject,
-        notif_title: "Email Baru",
-        notif_body: "Anda mendapatkan pesan baru",
-        channel_id: channelId,
-        sound_name: soundName
+        notif_title: "Pesan Masuk",
+        notif_body: "Anda mendapat pesan masuk",
+        channel_id: "channel_email_umum_v3",
+        sound_name: "sound_umum"
       },
       token: fcmToken
     };
 
-    console.log(`Sending FCM data-only notification to token: ${fcmToken} (channel: ${channelId}, sound: ${soundName})`);
+    console.log(`Sending universal FCM data-only notification to token: ${fcmToken} (channel: channel_email_umum_v3, sound: sound_umum)`);
     const response = await messaging.send(message);
     console.log('Successfully sent FCM data-only message:', response);
 
