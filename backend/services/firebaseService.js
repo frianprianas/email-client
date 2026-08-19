@@ -246,7 +246,136 @@ async function sendAttendReminderToAll(title, body, type = 'masuk') {
   }
 }
 
+/**
+ * Sends a push notification for BaknusChat (Japri) using Firebase Cloud Messaging (FCM).
+ * @param {object} params
+ * @param {string} params.recipient_email - The recipient's email address.
+ * @param {string} [params.sender_name] - The sender's name.
+ * @param {string} [params.sender_email] - The sender's email address.
+ * @param {string} [params.sender_tag] - The sender's tag/role ('Guru', 'TU', 'Siswa').
+ * @param {string} [params.message] - The message text.
+ * @returns {Promise<object>} Result of the notification attempt.
+ */
+async function sendChatNotification({ recipient_email, sender_name, sender_email, sender_tag, message }) {
+  if (!initialized || !db || !messaging) {
+    throw new Error('Firebase Admin SDK is not initialized. Please verify credentials.');
+  }
+
+  if (!recipient_email || typeof recipient_email !== 'string') {
+    throw new Error('recipient_email is required');
+  }
+
+  const userEmail = recipient_email.toLowerCase().trim();
+  const sName = sender_name ? sender_name.trim() : 'Teman';
+  const sEmail = sender_email ? sender_email.trim() : '';
+  const sTag = sender_tag ? sender_tag.trim() : '';
+  const rawMessage = (message || '').trim();
+
+  // Snippet maksimal 100 karakter
+  const messageSnippet = rawMessage.length > 100 
+    ? rawMessage.substring(0, 97) + '...' 
+    : (rawMessage || 'Mengirim pesan baru');
+
+  const notifTitle = sTag ? `💬 ${sName} [${sTag}]` : `💬 ${sName}`;
+
+  console.log(`[firebaseService] Searching FCM token for chat recipient: ${userEmail}`);
+
+  try {
+    const docRef = db.collection('user_tokens').doc(userEmail);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      console.log(`[firebaseService] Token tidak ditemukan untuk chat recipient: ${userEmail}`);
+      return { success: false, reason: 'Token not found in Firestore for this recipient', successCount: 0 };
+    }
+
+    const userData = doc.data() || {};
+    let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
+    if (tokens.length === 0 && userData.fcm_token) {
+      tokens = [userData.fcm_token];
+    }
+
+    // Filter token kosong & hapus duplikat
+    tokens = Array.from(new Set(tokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
+
+    if (tokens.length === 0) {
+      console.log(`[firebaseService] Tidak ada token FCM valid untuk user: ${userEmail}`);
+      return { success: false, reason: 'No valid FCM tokens found for recipient', successCount: 0 };
+    }
+
+    // Buat payload multicast FCM
+    const fcmMessage = {
+      notification: {
+        title: notifTitle,
+        body: messageSnippet
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'channel_email_umum_v3',
+          defaultSound: true,
+          sound: 'sound_umum'
+        }
+      },
+      data: {
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        route: '/chat',
+        notif_title: notifTitle,
+        notif_body: messageSnippet,
+        channel_id: 'channel_email_umum_v3',
+        sound_name: 'sound_umum',
+        sender_email: sEmail,
+        sender_name: sName,
+        sender_tag: sTag,
+        peer_email: sEmail,
+        peer_name: sName,
+        peer_tag: sTag
+      },
+      tokens: tokens
+    };
+
+    console.log(`[firebaseService] Sending multicast FCM chat notification to ${tokens.length} device(s) for ${userEmail}`);
+    const response = await messaging.sendEachForMulticast(fcmMessage);
+    console.log(`[firebaseService] Chat notification sent: ${response.successCount} succeeded, ${response.failureCount} failed.`);
+
+    // Auto Cleanup Token Invalid / Unregistered jika ada failure
+    if (response.failureCount > 0 && response.responses) {
+      const invalidTokens = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error) {
+          const errorCode = resp.error.code;
+          if (
+            errorCode === 'messaging/invalid-registration-token' ||
+            errorCode === 'messaging/registration-token-not-registered'
+          ) {
+            invalidTokens.push(tokens[idx]);
+          }
+        }
+      });
+
+      if (invalidTokens.length > 0) {
+        console.log(`[firebaseService] Cleaning up ${invalidTokens.length} invalid/expired FCM token(s) for ${userEmail}...`);
+        await docRef.update({
+          fcm_tokens: FieldValue.arrayRemove(...invalidTokens)
+        }).catch(err => {
+          console.error(`[firebaseService] Failed to cleanup invalid FCM tokens for ${userEmail}:`, err.message);
+        });
+      }
+    }
+
+    return {
+      success: true,
+      successCount: response.successCount,
+      failureCount: response.failureCount
+    };
+  } catch (error) {
+    console.error('[firebaseService] Error sending chat push notification:', error);
+    throw new Error(`Failed to send chat push notification: ${error.message}`);
+  }
+}
+
 module.exports = {
   sendEmailNotification,
-  sendAttendReminderToAll
+  sendAttendReminderToAll,
+  sendChatNotification
 };
