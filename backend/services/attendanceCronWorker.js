@@ -55,7 +55,8 @@ function startAttendanceCron() {
     try {
       await sendAttendReminderToAll(
         '⏰ Pengingat Presensi Masuk',
-        'Jangan lupa untuk melakukan presensi masuk pagi ini!'
+        'Jangan lupa untuk melakukan presensi masuk pagi ini!',
+        'masuk'
       );
       console.log('[attendanceCron] Pengingat Presensi Masuk berhasil dikirim.');
     } catch (err) {
@@ -78,7 +79,8 @@ function startAttendanceCron() {
     try {
       await sendAttendReminderToAll(
         '🔔 Pengingat Presensi Pulang',
-        'Sudah jam pulang, silakan lakukan presensi pulang!'
+        'Sudah jam pulang, silakan lakukan presensi pulang!',
+        'pulang'
       );
       console.log('[attendanceCron] Pengingat Presensi Pulang berhasil dikirim.');
     } catch (err) {

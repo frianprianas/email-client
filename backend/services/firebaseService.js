@@ -131,46 +131,80 @@ async function sendEmailNotification(to, from, subject) {
 }
 
 /**
- * Sends a push notification to ALL user devices registered in Firestore 'user_tokens' for attendance reminders.
- * @param {string} title - The notification title (e.g. "⏰ Pengingat Presensi Masuk")
+ * Sends a push notification to users who HAVE NOT DONE presence today.
+ * Queries BaknusAttend API for unattended emails, then fetches FCM tokens from Firestore.
+ * @param {string} title - The notification title
  * @param {string} body - The notification body message.
+ * @param {string} type - 'masuk' or 'pulang'
  * @returns {Promise<object>} Result of the multicast notification attempt.
  */
-async function sendAttendReminderToAll(title, body) {
+async function sendAttendReminderToAll(title, body, type = 'masuk') {
   if (!initialized || !db || !messaging) {
     throw new Error('Firebase Admin SDK is not initialized. Please verify credentials.');
   }
 
-  console.log('[firebaseService] Mengumpulkan seluruh token FCM untuk pengingat presensi...');
+  const axios = require('axios');
+  let targetEmails = null;
+
+  // 1. Coba ambil daftar email user yang BELUM presensi dari BaknusAttend API
+  try {
+    const attendApiUrl = process.env.BAKNUSATTEND_API_URL || 'https://baknusattend.smkbn666.sch.id';
+    console.log(`[firebaseService] Mengontak BaknusAttend API (${attendApiUrl}/api/presence/unattended-emails?type=${type})...`);
+    
+    const res = await axios.get(`${attendApiUrl}/api/presence/unattended-emails?type=${type}`, { timeout: 5000 });
+    if (res.data && res.data.status === 'SUCCESS' && Array.isArray(res.data.emails)) {
+      targetEmails = res.data.emails.map(e => e.toLowerCase().trim());
+      console.log(`[firebaseService] Sinkronisasi BaknusAttend Berhasil: Ditemukan ${targetEmails.length} user BELUM presensi ${type}.`);
+    }
+  } catch (err) {
+    console.warn(`[firebaseService] Gagal sinkronisasi dengan BaknusAttend API (${err.message}). Menggunakan fallback ke seluruh user.`);
+  }
 
   try {
-    const snapshot = await db.collection('user_tokens').get();
-    if (snapshot.empty) {
-      console.log('[firebaseService] Koleksi user_tokens kosong. Tidak ada notifikasi yang dikirim.');
-      return { success: false, reason: 'No user tokens found in Firestore' };
-    }
-
     let allTokens = [];
-    snapshot.forEach(doc => {
-      const userData = doc.data() || {};
-      let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
-      if (tokens.length === 0 && userData.fcm_token) {
-        tokens = [userData.fcm_token];
+
+    if (targetEmails && targetEmails.length > 0) {
+      // Ambil token Firestore HANYA untuk user yang BELUM presensi
+      for (const email of targetEmails) {
+        const doc = await db.collection('user_tokens').doc(email).get();
+        if (doc.exists) {
+          const userData = doc.data() || {};
+          let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
+          if (tokens.length === 0 && userData.fcm_token) {
+            tokens = [userData.fcm_token];
+          }
+          allTokens.push(...tokens);
+        }
       }
-      allTokens.push(...tokens);
-    });
+    } else if (targetEmails && targetEmails.length === 0) {
+      console.log(`[firebaseService] HEBAT! Seluruh user SUDAH melakukan presensi ${type} hari ini. Pengingat tidak perlu dikirim.`);
+      return { success: true, reason: 'All users have already done attendance', successCount: 0 };
+    } else {
+      // Fallback jika API BaknusAttend tidak dapat dijangkau
+      const snapshot = await db.collection('user_tokens').get();
+      if (!snapshot.empty) {
+        snapshot.forEach(doc => {
+          const userData = doc.data() || {};
+          let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
+          if (tokens.length === 0 && userData.fcm_token) {
+            tokens = [userData.fcm_token];
+          }
+          allTokens.push(...tokens);
+        });
+      }
+    }
 
     // Deduplicate and filter non-empty string tokens
     allTokens = Array.from(new Set(allTokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
 
     if (allTokens.length === 0) {
-      console.log('[firebaseService] Tidak ada token FCM valid yang ditemukan.');
+      console.log('[firebaseService] Tidak ada token FCM valid yang perlu dikirimkan notifikasi.');
       return { success: false, reason: 'No valid FCM tokens found' };
     }
 
-    console.log(`[firebaseService] Mengirim pengingat presensi ke ${allTokens.length} perangkat...`);
+    console.log(`[firebaseService] Mengirim pengingat presensi ${type} ke ${allTokens.length} perangkat...`);
 
-    const chunkSize = 500; // FCM multicast max limit per batch
+    const chunkSize = 500;
     let totalSuccess = 0;
     let totalFailure = 0;
 
@@ -199,7 +233,7 @@ async function sendAttendReminderToAll(title, body) {
       totalFailure += response.failureCount;
     }
 
-    console.log(`[firebaseService] Finished sending attendance reminder. Success: ${totalSuccess}, Failure: ${totalFailure}`);
+    console.log(`[firebaseService] Selesai mengirim pengingat presensi ${type}. Sukses: ${totalSuccess}, Gagal: ${totalFailure}`);
     return {
       success: true,
       totalTokens: allTokens.length,
@@ -207,7 +241,7 @@ async function sendAttendReminderToAll(title, body) {
       failureCount: totalFailure
     };
   } catch (error) {
-    console.error('[firebaseService] Failed to send attendance reminder:', error);
+    console.error('[firebaseService] Gagal mengirim pengingat presensi:', error);
     throw new Error(`Failed to send attendance reminder: ${error.message}`);
   }
 }
