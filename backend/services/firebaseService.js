@@ -130,6 +130,89 @@ async function sendEmailNotification(to, from, subject) {
   }
 }
 
+/**
+ * Sends a push notification to ALL user devices registered in Firestore 'user_tokens' for attendance reminders.
+ * @param {string} title - The notification title (e.g. "⏰ Pengingat Presensi Masuk")
+ * @param {string} body - The notification body message.
+ * @returns {Promise<object>} Result of the multicast notification attempt.
+ */
+async function sendAttendReminderToAll(title, body) {
+  if (!initialized || !db || !messaging) {
+    throw new Error('Firebase Admin SDK is not initialized. Please verify credentials.');
+  }
+
+  console.log('[firebaseService] Mengumpulkan seluruh token FCM untuk pengingat presensi...');
+
+  try {
+    const snapshot = await db.collection('user_tokens').get();
+    if (snapshot.empty) {
+      console.log('[firebaseService] Koleksi user_tokens kosong. Tidak ada notifikasi yang dikirim.');
+      return { success: false, reason: 'No user tokens found in Firestore' };
+    }
+
+    let allTokens = [];
+    snapshot.forEach(doc => {
+      const userData = doc.data() || {};
+      let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
+      if (tokens.length === 0 && userData.fcm_token) {
+        tokens = [userData.fcm_token];
+      }
+      allTokens.push(...tokens);
+    });
+
+    // Deduplicate and filter non-empty string tokens
+    allTokens = Array.from(new Set(allTokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
+
+    if (allTokens.length === 0) {
+      console.log('[firebaseService] Tidak ada token FCM valid yang ditemukan.');
+      return { success: false, reason: 'No valid FCM tokens found' };
+    }
+
+    console.log(`[firebaseService] Mengirim pengingat presensi ke ${allTokens.length} perangkat...`);
+
+    const chunkSize = 500; // FCM multicast max limit per batch
+    let totalSuccess = 0;
+    let totalFailure = 0;
+
+    for (let i = 0; i < allTokens.length; i += chunkSize) {
+      const batchTokens = allTokens.slice(i, i + chunkSize);
+
+      const message = {
+        android: {
+          priority: 'high',
+          collapseKey: 'baknus_attend_reminder'
+        },
+        data: {
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          route: '/attend',
+          target: 'attend',
+          notif_title: title,
+          notif_body: body,
+          channel_id: 'channel_baknus_attend_v3',
+          sound_name: 'sound_baknus_attend'
+        },
+        tokens: batchTokens
+      };
+
+      const response = await messaging.sendEachForMulticast(message);
+      totalSuccess += response.successCount;
+      totalFailure += response.failureCount;
+    }
+
+    console.log(`[firebaseService] Finished sending attendance reminder. Success: ${totalSuccess}, Failure: ${totalFailure}`);
+    return {
+      success: true,
+      totalTokens: allTokens.length,
+      successCount: totalSuccess,
+      failureCount: totalFailure
+    };
+  } catch (error) {
+    console.error('[firebaseService] Failed to send attendance reminder:', error);
+    throw new Error(`Failed to send attendance reminder: ${error.message}`);
+  }
+}
+
 module.exports = {
-  sendEmailNotification
+  sendEmailNotification,
+  sendAttendReminderToAll
 };

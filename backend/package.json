@@ -23,6 +23,7 @@
     "imapflow": "^1.2.9",
     "jsonwebtoken": "^9.0.3",
     "mailparser": "^3.9.3",
+    "node-cron": "^3.0.3",
     "nodemailer": "^8.0.1",
     "pg": "^8.18.0",
     "sequelize": "^6.37.7"

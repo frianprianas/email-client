@@ -19,6 +19,7 @@ const SnoozedEmail = require('./models/SnoozedEmail');
 const User = require('./models/User');
 const ImapService = require('./services/imapService');
 const { startEmailCheckWorker } = require('./services/emailCheckWorker');
+const { startAttendanceCron } = require('./services/attendanceCronWorker');
 
 const scheduleRoutes = require('./routes/schedule');
 
@@ -214,6 +215,7 @@ sequelize.sync({ alter: true })
     setInterval(processSnoozedEmails, 60000);
     setInterval(processScheduledEmails, 60000); // Check scheduled emails every minute
     startEmailCheckWorker(); // Check new emails and trigger push notifications
+    startAttendanceCron(); // Start automated attendance reminder cron (07:45 & 15:00)
 
     app.listen(PORT, () => {
       console.log(`BaknusMail API running on port ${PORT}`);
