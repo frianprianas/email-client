@@ -30,6 +30,15 @@ try {
 }
 
 /**
+ * Helper to extract clean email address from string (e.g. "Name <email@domain.com>" -> "email@domain.com")
+ */
+function extractCleanEmail(emailStr) {
+  if (!emailStr || typeof emailStr !== 'string') return '';
+  const match = emailStr.match(/<([^>]+)>/) || emailStr.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  return match ? match[1].toLowerCase().trim() : emailStr.toLowerCase().trim();
+}
+
+/**
  * Sends a push notification using Firebase Cloud Messaging (FCM) when a new email is received.
  * @param {string} to - The recipient's email address.
  * @param {string} from - The sender's email address.
@@ -41,8 +50,16 @@ async function sendEmailNotification(to, from, subject) {
     throw new Error('Firebase Admin SDK is not initialized. Please verify credentials.');
   }
 
-  const userEmail = to.toLowerCase().trim();
-  console.log(`Searching FCM token for recipient: ${userEmail}`);
+  const userEmail = extractCleanEmail(to);
+  const sFrom = from ? from.trim() : 'Pengirim Tidak Dikenal';
+  const sSubject = (subject && typeof subject === 'string' && subject.trim().length > 0)
+    ? subject.trim()
+    : '(Tanpa Subjek)';
+
+  const notifTitle = `📧 Pesan Masuk dari ${sFrom}`;
+  const notifBody = sSubject.length > 100 ? sSubject.substring(0, 97) + '...' : sSubject;
+
+  console.log(`[firebaseService] Searching FCM token for recipient: ${userEmail}`);
 
   try {
     // 1. Ambil dokumen dari Firestore 'user_tokens'
@@ -50,8 +67,8 @@ async function sendEmailNotification(to, from, subject) {
     const doc = await docRef.get();
     
     if (!doc.exists) {
-      console.log(`Token tidak ditemukan untuk ${userEmail}`);
-      return { success: false, reason: 'Token not found in Firestore for this recipient' };
+      console.log(`[firebaseService] Token tidak ditemukan untuk ${userEmail}`);
+      return { success: false, reason: 'Token not found in Firestore for this recipient', successCount: 0 };
     }
     
     const userData = doc.data() || {};
@@ -66,33 +83,42 @@ async function sendEmailNotification(to, from, subject) {
     tokens = Array.from(new Set(tokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
 
     if (tokens.length === 0) {
-      console.log(`Tidak ada token FCM valid untuk user: ${userEmail}`);
-      return { success: false, reason: 'No valid FCM tokens found for recipient' };
+      console.log(`[firebaseService] Tidak ada token FCM valid untuk user: ${userEmail}`);
+      return { success: false, reason: 'No valid FCM tokens found for recipient', successCount: 0 };
     }
 
-    // 3. Buat & kirim payload FCM Multicast Push Notification (DATA ONLY)
+    // 3. Buat & kirim payload FCM Multicast Push Notification (dengan notification block agar muncul saat app closed)
     const message = {
+      notification: {
+        title: notifTitle,
+        body: notifBody
+      },
       android: {
         priority: "high",
-        collapseKey: "baknus_email_latest"
+        collapseKey: "baknus_email_latest",
+        notification: {
+          channelId: "channel_email_umum_v3",
+          defaultSound: true,
+          sound: "sound_umum"
+        }
       },
       data: {
         click_action: "FLUTTER_NOTIFICATION_CLICK",
         route: "/home",
-        email_to: to,
-        email_from: from,
-        subject: subject,
-        notif_title: "Pesan Masuk",
-        notif_body: "Anda mendapat pesan masuk",
+        email_to: userEmail,
+        email_from: sFrom,
+        subject: sSubject,
+        notif_title: notifTitle,
+        notif_body: notifBody,
         channel_id: "channel_email_umum_v3",
         sound_name: "sound_umum"
       },
       tokens: tokens
     };
 
-    console.log(`Sending multicast FCM data-only notification to ${tokens.length} device(s) for ${userEmail}`);
+    console.log(`[firebaseService] Sending multicast FCM email notification to ${tokens.length} device(s) for ${userEmail}`);
     const response = await messaging.sendEachForMulticast(message);
-    console.log(`Successfully processed multicast FCM message: ${response.successCount} succeeded, ${response.failureCount} failed.`);
+    console.log(`[firebaseService] Successfully processed multicast FCM email message: ${response.successCount} succeeded, ${response.failureCount} failed.`);
 
     // 4. Auto Cleanup Token Invalid / Unregistered jika ada failure
     if (response.failureCount > 0 && response.responses) {
@@ -110,11 +136,11 @@ async function sendEmailNotification(to, from, subject) {
       });
 
       if (invalidTokens.length > 0) {
-        console.log(`Cleaning up ${invalidTokens.length} invalid/expired FCM token(s) for ${userEmail}...`);
+        console.log(`[firebaseService] Cleaning up ${invalidTokens.length} invalid/expired FCM token(s) for ${userEmail}...`);
         await docRef.update({
           fcm_tokens: FieldValue.arrayRemove(...invalidTokens)
         }).catch(err => {
-          console.error(`Failed to cleanup invalid FCM tokens for ${userEmail}:`, err.message);
+          console.error(`[firebaseService] Failed to cleanup invalid FCM tokens for ${userEmail}:`, err.message);
         });
       }
     }
@@ -125,7 +151,7 @@ async function sendEmailNotification(to, from, subject) {
       failureCount: response.failureCount
     };
   } catch (error) {
-    console.error('Error sending push notification:', error);
+    console.error('[firebaseService] Error sending email push notification:', error);
     throw new Error(`Failed to send push notification: ${error.message}`);
   }
 }
