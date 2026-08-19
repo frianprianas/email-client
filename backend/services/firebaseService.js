@@ -1,5 +1,5 @@
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const path = require('path');
 const fs = require('fs');
@@ -94,11 +94,35 @@ async function sendEmailNotification(to, from, subject) {
     const response = await messaging.sendEachForMulticast(message);
     console.log(`Successfully processed multicast FCM message: ${response.successCount} succeeded, ${response.failureCount} failed.`);
 
+    // 4. Auto Cleanup Token Invalid / Unregistered jika ada failure
+    if (response.failureCount > 0 && response.responses) {
+      const invalidTokens = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error) {
+          const errorCode = resp.error.code;
+          if (
+            errorCode === 'messaging/invalid-registration-token' ||
+            errorCode === 'messaging/registration-token-not-registered'
+          ) {
+            invalidTokens.push(tokens[idx]);
+          }
+        }
+      });
+
+      if (invalidTokens.length > 0) {
+        console.log(`Cleaning up ${invalidTokens.length} invalid/expired FCM token(s) for ${userEmail}...`);
+        await docRef.update({
+          fcm_tokens: FieldValue.arrayRemove(...invalidTokens)
+        }).catch(err => {
+          console.error(`Failed to cleanup invalid FCM tokens for ${userEmail}:`, err.message);
+        });
+      }
+    }
+
     return { 
       success: true, 
       successCount: response.successCount, 
-      failureCount: response.failureCount,
-      responses: response.responses
+      failureCount: response.failureCount
     };
   } catch (error) {
     console.error('Error sending push notification:', error);
