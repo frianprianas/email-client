@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'http://mail.smk.baktinusantara666.sch.id';
+const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'https://mail.smk.baktinusantara666.sch.id';
 const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY || '925B68-0FF6BB-36B760-F6C051-AAF343';
 
 /**
