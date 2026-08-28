@@ -15,6 +15,7 @@ const snoozeRoutes = require('./routes/snooze');
 const publicRoutes = require('./routes/public');
 const webhookRoutes = require('./routes/webhook');
 const chatRoutes = require('./routes/chat');
+const integrationRoutes = require('./routes/integration');
 
 const SnoozedEmail = require('./models/SnoozedEmail');
 const User = require('./models/User');
@@ -63,6 +64,7 @@ app.use('/api/schedule', scheduleRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/webhook', webhookRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/integration', integrationRoutes);
 
 // ... (health check, error handler, snooze worker)
 
