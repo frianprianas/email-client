@@ -30,7 +30,7 @@ const handleProfileUpdate = async (req, res) => {
             avatar,
             signature,
             theme,
-            validateAvatarWithAI = true,
+            validateAvatarWithAI = false, // Default false for 3rd parties (bypasses AI verification unless explicitly requested)
             aiMode = 'online'
         } = req.body;
 
@@ -50,9 +50,10 @@ const handleProfileUpdate = async (req, res) => {
         }
 
         let aiVerificationResult = null;
+        const shouldValidateAI = validateAvatarWithAI === true || validateAvatarWithAI === 'true';
 
-        // Run BaknusAI Validation if avatar is provided & validateAvatarWithAI is enabled
-        if (avatar && validateAvatarWithAI) {
+        // Run BaknusAI Validation ONLY if explicitly requested by 3rd party (validateAvatarWithAI: true)
+        if (avatar && shouldValidateAI) {
             try {
                 if (aiMode === 'online') {
                     // Batasan harian BaknusAI Online: maksimal 5 kali per hari per user
@@ -103,7 +104,7 @@ const handleProfileUpdate = async (req, res) => {
             }
         }
 
-        // Apply Updates
+        // Apply Updates directly to User profile
         const updates = {};
         if (displayName !== undefined) updates.displayName = displayName;
         if (avatar !== undefined) updates.avatar = avatar;
@@ -114,7 +115,9 @@ const handleProfileUpdate = async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Profil pengguna berhasil diperbarui melalui integrasi pihak ke-3 dengan verifikasi BaknusAI.',
+            message: shouldValidateAI
+                ? 'Profil pengguna berhasil diperbarui melalui integrasi pihak ke-3 dengan verifikasi BaknusAI.'
+                : 'Profil pengguna (termasuk foto profil) berhasil diperbarui secara langsung oleh pihak ke-3 tanpa verifikasi AI.',
             ai_verification: aiVerificationResult,
             user: {
                 id: user.id,
@@ -137,12 +140,12 @@ const handleProfileUpdate = async (req, res) => {
 };
 
 /**
- * @api {post} /api/integration/user-profile Update User Profile via 3rd Party with BaknusAI Verification
+ * @api {post} /api/integration/user-profile Update User Profile via 3rd Party
  */
 router.post('/user-profile', integrationApiKeyMiddleware, handleProfileUpdate);
 
 /**
- * @api {put} /api/integration/user-profile Update User Profile via 3rd Party with BaknusAI Verification
+ * @api {put} /api/integration/user-profile Update User Profile via 3rd Party
  */
 router.put('/user-profile', integrationApiKeyMiddleware, handleProfileUpdate);
 
