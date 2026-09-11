@@ -4,10 +4,12 @@ const ImapService = require('./imapService');
 const { sendEmailNotification } = require('./firebaseService');
 
 /**
- * Periodically checks IMAP for unseen emails for all users who have registered an FCM token in Firestore.
+ * Periodically checks IMAP for new emails based on UID (> lastNotifiedUid)
+ * for all users who have registered an FCM token in Firestore.
+ * Does not restrict to UNSEEN and does not mark emails as \Seen.
  */
 async function checkEmailsForAllUsers() {
-  console.log('[EmailCheckWorker] Starting periodic IMAP check for unseen emails...');
+  console.log('[EmailCheckWorker] Starting periodic IMAP check for new emails...');
   try {
     const db = getFirestore();
     
@@ -38,53 +40,52 @@ async function checkEmailsForAllUsers() {
         // Decrypt password
         const password = Buffer.from(user.imapPassword, 'base64').toString('utf-8');
 
-        // 3. Connect to IMAP and retrieve unseen messages
+        // 3. Connect to IMAP and retrieve new messages by UID (without UNSEEN filter, preserving seen flag)
         const imapService = new ImapService(email, password);
-        const unseenEmails = await imapService.getUnseenMessages();
+        const result = await imapService.getNewMessages(lastNotifiedUid);
 
-        if (unseenEmails && unseenEmails.length > 0) {
-          console.log(`[EmailCheckWorker] Found ${unseenEmails.length} unseen emails for ${email}.`);
+        if (result.isInitialSync) {
+          // First-time initialization for this user:
+          // Set marker to current highest mailbox UID so we don't spam historical emails
+          await db.collection('user_tokens').doc(email).update({
+            last_notified_uid: result.highestUid
+          });
+          console.log(`[EmailCheckWorker] Initialized last_notified_uid for ${email} to ${result.highestUid} (historical emails skipped)`);
+          continue;
+        }
 
-          // Filter out messages that have already been notified
-          const newEmails = unseenEmails.filter(msg => msg.uid > lastNotifiedUid);
-          
-          if (newEmails.length > 0) {
-            // Sort UIDs ascending to process in order
-            newEmails.sort((a, b) => a.uid - b.uid);
-            let maxUid = lastNotifiedUid;
+        const newEmails = result.messages || [];
+        if (newEmails.length > 0) {
+          console.log(`[EmailCheckWorker] Found ${newEmails.length} new email(s) (UID > ${lastNotifiedUid}) for ${email}.`);
+          newEmails.sort((a, b) => a.uid - b.uid);
+          let maxUid = lastNotifiedUid;
 
-            if (lastNotifiedUid === 0) {
-              // First-time initialization for this user:
-              // Set the marker to the highest current UID to avoid spamming historical unreads
-              maxUid = Math.max(...newEmails.map(msg => msg.uid));
-              console.log(`[EmailCheckWorker] Initializing last_notified_uid for ${email} to ${maxUid} (historical unreads skipped)`);
-            } else {
-              // Notify user for each new unseen email
-              for (const msg of newEmails) {
-                try {
-                  console.log(`[EmailCheckWorker] Sending notification to ${email} for email from: ${msg.from}`);
-                  await sendEmailNotification(email, msg.from, msg.subject);
-                  if (msg.uid > maxUid) {
-                    maxUid = msg.uid;
-                  }
-                } catch (notiErr) {
-                  console.error(`[EmailCheckWorker] Error sending notification for email UID ${msg.uid} to ${email}:`, notiErr.message);
-                }
-              }
-            }
-
-            // 4. Update the last_notified_uid marker in Firestore
-            if (maxUid > lastNotifiedUid) {
-              await db.collection('user_tokens').doc(email).update({
-                last_notified_uid: maxUid
+          for (const msg of newEmails) {
+            try {
+              console.log(`[EmailCheckWorker] Sending notification to ${email} for email UID ${msg.uid} from: ${msg.from}`);
+              await sendEmailNotification(email, {
+                to: email,
+                from: msg.from,
+                fromName: msg.fromName,
+                subject: msg.subject
               });
-              console.log(`[EmailCheckWorker] Updated last_notified_uid for ${email} in Firestore to: ${maxUid}`);
+              if (msg.uid > maxUid) {
+                maxUid = msg.uid;
+              }
+            } catch (notiErr) {
+              console.error(`[EmailCheckWorker] Error sending notification for email UID ${msg.uid} to ${email}:`, notiErr.message);
             }
-          } else {
-            console.log(`[EmailCheckWorker] No new emails (UID > ${lastNotifiedUid}) for ${email}.`);
+          }
+
+          // 4. Update the last_notified_uid marker in Firestore
+          if (maxUid > lastNotifiedUid) {
+            await db.collection('user_tokens').doc(email).update({
+              last_notified_uid: maxUid
+            });
+            console.log(`[EmailCheckWorker] Updated last_notified_uid for ${email} in Firestore to: ${maxUid}`);
           }
         } else {
-          console.log(`[EmailCheckWorker] No unseen emails in INBOX for ${email}.`);
+          console.log(`[EmailCheckWorker] No new emails (UID > ${lastNotifiedUid}) for ${email}.`);
         }
       } catch (userErr) {
         console.error(`[EmailCheckWorker] Error processing email check for ${email}:`, userErr.message);

@@ -40,92 +40,123 @@ function extractCleanEmail(emailStr) {
 
 /**
  * Sends a push notification using Firebase Cloud Messaging (FCM) when a new email is received.
- * @param {string} to - The recipient's email address.
- * @param {string} from - The sender's email address.
- * @param {string} subject - The subject of the email.
+ * Supports:
+ *  - sendEmailNotification(userTokens, emailData)
+ *  - sendEmailNotification(toEmail, emailData)
+ *  - sendEmailNotification(toEmail, from, subject, fromName)
+ * @param {string|string[]} toOrTokens - Recipient email address or array of FCM tokens.
+ * @param {string|object} param2 - Sender email string or emailData object.
+ * @param {string} [param3] - Email subject.
+ * @param {string} [param4] - Sender display name.
  * @returns {Promise<object>} Result of the notification attempt.
  */
-async function sendEmailNotification(to, from, subject) {
+async function sendEmailNotification(toOrTokens, param2, param3, param4) {
   if (!initialized || !db || !messaging) {
     throw new Error('Firebase Admin SDK is not initialized. Please verify credentials.');
   }
 
-  const userEmail = extractCleanEmail(to);
-  const sFrom = from ? from.trim() : 'Pengirim Tidak Dikenal';
-  const sSubject = (subject && typeof subject === 'string' && subject.trim().length > 0)
-    ? subject.trim()
-    : '(Tanpa Subjek)';
+  let tokens = [];
+  let userEmail = '';
+  let docRef = null;
+  let emailData = {};
 
-  const notifTitle = `📧 Pesan Masuk dari ${sFrom}`;
-  const notifBody = sSubject.length > 100 ? sSubject.substring(0, 97) + '...' : sSubject;
+  if (Array.isArray(toOrTokens)) {
+    tokens = toOrTokens;
+    emailData = (typeof param2 === 'object' && param2 !== null)
+      ? param2
+      : { from: param2, subject: param3, fromName: param4 };
+    userEmail = extractCleanEmail(emailData.to || '');
+    if (userEmail) {
+      docRef = db.collection('user_tokens').doc(userEmail);
+    }
+  } else if (typeof toOrTokens === 'string') {
+    if (toOrTokens.includes('@')) {
+      userEmail = extractCleanEmail(toOrTokens);
+      emailData = (typeof param2 === 'object' && param2 !== null)
+        ? { to: userEmail, ...param2 }
+        : { to: userEmail, from: param2, subject: param3, fromName: param4 };
 
-  console.log(`[firebaseService] Searching FCM token for recipient: ${userEmail}`);
+      docRef = db.collection('user_tokens').doc(userEmail);
+      const doc = await docRef.get();
+
+      if (!doc.exists) {
+        console.log(`[firebaseService] Token tidak ditemukan untuk ${userEmail}`);
+        return { success: false, reason: 'Token not found in Firestore for this recipient', successCount: 0 };
+      }
+
+      const userData = doc.data() || {};
+      tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
+      if (tokens.length === 0 && userData.fcm_token) {
+        tokens = [userData.fcm_token];
+      }
+    } else {
+      tokens = [toOrTokens];
+      emailData = (typeof param2 === 'object' && param2 !== null)
+        ? param2
+        : { from: param2, subject: param3, fromName: param4 };
+      userEmail = extractCleanEmail(emailData.to || '');
+      if (userEmail) {
+        docRef = db.collection('user_tokens').doc(userEmail);
+      }
+    }
+  }
+
+  // Filter token kosong & hapus duplikat
+  tokens = Array.from(new Set(tokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
+
+  if (tokens.length === 0) {
+    console.log(`[firebaseService] Tidak ada token FCM valid untuk user: ${userEmail || 'unknown'}`);
+    return { success: false, reason: 'No valid FCM tokens found for recipient', successCount: 0 };
+  }
+
+  const senderDisplay = emailData.fromName || emailData.from || 'Pengirim Tidak Dikenal';
+  const notifTitle = `Email dari ${senderDisplay}`;
+  const notifBody = emailData.subject || "Anda menerima pesan email baru";
+
+  const message = {
+    // ⚠️ 1. WAJIB: Blok notification root agar OS Android langsung menampilkan banner notifikasi
+    notification: {
+      title: notifTitle,
+      body: notifBody,
+    },
+    // ⚠️ 2. WAJIB: Konfigurasi Android agar masuk ke channel v4 dan berbunyi
+    android: {
+      priority: "high",
+      notification: {
+        channelId: "channel_email_umum_v4", // WAJIB: channel_email_umum_v4
+        sound: "sound_umum",                 // File sound_umum.mp3 di client
+        priority: "max",
+        defaultSound: false,
+        defaultVibrateTimings: true,
+      },
+    },
+    // 3. Blok data untuk routing saat notifikasi diklik
+    data: {
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      route: "/home",
+      email_to: String(emailData.to || userEmail || ""),
+      email_from: String(emailData.from || ""),
+      subject: String(emailData.subject || ""),
+      notif_title: notifTitle,
+      notif_body: notifBody,
+      channel_id: "channel_email_umum_v4",
+      sound_name: "sound_umum",
+    },
+    tokens: tokens,
+  };
 
   try {
-    // 1. Ambil dokumen dari Firestore 'user_tokens'
-    const docRef = db.collection('user_tokens').doc(userEmail); 
-    const doc = await docRef.get();
-    
-    if (!doc.exists) {
-      console.log(`[firebaseService] Token tidak ditemukan untuk ${userEmail}`);
-      return { success: false, reason: 'Token not found in Firestore for this recipient', successCount: 0 };
-    }
-    
-    const userData = doc.data() || {};
-    
-    // 2. Ambil daftar array fcm_tokens (atau fallback ke fcm_token tunggal jika lama)
-    let tokens = Array.isArray(userData.fcm_tokens) ? userData.fcm_tokens : [];
-    if (tokens.length === 0 && userData.fcm_token) {
-      tokens = [userData.fcm_token];
-    }
-
-    // Filter token kosong & hapus duplikat
-    tokens = Array.from(new Set(tokens.filter(t => typeof t === 'string' && t.trim().length > 0)));
-
-    if (tokens.length === 0) {
-      console.log(`[firebaseService] Tidak ada token FCM valid untuk user: ${userEmail}`);
-      return { success: false, reason: 'No valid FCM tokens found for recipient', successCount: 0 };
-    }
-
-    // 3. Buat & kirim payload FCM Multicast Push Notification (dengan notification block agar muncul saat app closed)
-    const message = {
-      notification: {
-        title: notifTitle,
-        body: notifBody
-      },
-      android: {
-        priority: "high",
-        collapseKey: "baknus_email_latest",
-        notification: {
-          channelId: "channel_email_umum_v3",
-          defaultSound: true,
-          sound: "sound_umum"
-        }
-      },
-      data: {
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-        route: "/home",
-        email_to: userEmail,
-        email_from: sFrom,
-        subject: sSubject,
-        notif_title: notifTitle,
-        notif_body: notifBody,
-        channel_id: "channel_email_umum_v3",
-        sound_name: "sound_umum"
-      },
-      tokens: tokens
-    };
-
-    console.log(`[firebaseService] Sending multicast FCM email notification to ${tokens.length} device(s) for ${userEmail}`);
+    console.log(`[FCM] Mengirim multicast notification ke ${tokens.length} device untuk ${userEmail || emailData.to}`);
     const response = await messaging.sendEachForMulticast(message);
-    console.log(`[firebaseService] Successfully processed multicast FCM email message: ${response.successCount} succeeded, ${response.failureCount} failed.`);
+    console.log(`[FCM] Kirim ke ${emailData.to || userEmail}: Berhasil=${response.successCount}, Gagal=${response.failureCount}`);
 
-    // 4. Auto Cleanup Token Invalid / Unregistered jika ada failure
+    // Auto Cleanup Token Invalid / Unregistered jika ada failure
     if (response.failureCount > 0 && response.responses) {
       const invalidTokens = [];
       response.responses.forEach((resp, idx) => {
-        if (!resp.success && resp.error) {
-          const errorCode = resp.error.code;
+        if (!resp.success) {
+          console.error(`[FCM Error] Token [${tokens[idx]}]:`, resp.error);
+          const errorCode = resp.error ? resp.error.code : null;
           if (
             errorCode === 'messaging/invalid-registration-token' ||
             errorCode === 'messaging/registration-token-not-registered'
@@ -135,23 +166,23 @@ async function sendEmailNotification(to, from, subject) {
         }
       });
 
-      if (invalidTokens.length > 0) {
-        console.log(`[firebaseService] Cleaning up ${invalidTokens.length} invalid/expired FCM token(s) for ${userEmail}...`);
+      if (docRef && invalidTokens.length > 0) {
+        console.log(`[FCM] Cleaning up ${invalidTokens.length} invalid/expired FCM token(s) for ${userEmail}...`);
         await docRef.update({
           fcm_tokens: FieldValue.arrayRemove(...invalidTokens)
         }).catch(err => {
-          console.error(`[firebaseService] Failed to cleanup invalid FCM tokens for ${userEmail}:`, err.message);
+          console.error(`[FCM] Failed to cleanup invalid FCM tokens for ${userEmail}:`, err.message);
         });
       }
     }
 
     return { 
-      success: true, 
+      success: response.successCount > 0, 
       successCount: response.successCount, 
       failureCount: response.failureCount
     };
   } catch (error) {
-    console.error('[firebaseService] Error sending email push notification:', error);
+    console.error('[FCM Exception] Gagal mengirim notifikasi:', error);
     throw new Error(`Failed to send push notification: ${error.message}`);
   }
 }
@@ -338,9 +369,11 @@ async function sendChatNotification({ recipient_email, sender_name, sender_email
       android: {
         priority: 'high',
         notification: {
-          channelId: 'channel_email_umum_v3',
-          defaultSound: true,
-          sound: 'sound_umum'
+          channelId: 'channel_email_umum_v4',
+          sound: 'sound_umum',
+          priority: 'max',
+          defaultSound: false,
+          defaultVibrateTimings: true
         }
       },
       data: {
@@ -348,7 +381,7 @@ async function sendChatNotification({ recipient_email, sender_name, sender_email
         route: '/chat',
         notif_title: notifTitle,
         notif_body: messageSnippet,
-        channel_id: 'channel_email_umum_v3',
+        channel_id: 'channel_email_umum_v4',
         sound_name: 'sound_umum',
         sender_email: sEmail,
         sender_name: sName,

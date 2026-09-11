@@ -628,6 +628,115 @@ class ImapService {
         return false;
     }
 
+    /**
+     * Retrieves new messages based on UID (> lastNotifiedUid) rather than just UNSEEN flag.
+     * Preserves read/unread status on the mail server (does not mark messages as \Seen).
+     * @param {number} lastNotifiedUid - The last UID that was already notified.
+     * @returns {Promise<{isInitialSync: boolean, highestUid: number, messages: Array}>}
+     */
+    async getNewMessages(lastNotifiedUid = 0) {
+        try {
+            await this.connect();
+            const imapFolder = 'INBOX';
+            const lock = await this.client.getMailboxLock(imapFolder);
+
+            try {
+                const status = await this.client.status(imapFolder, { messages: true, uidNext: true });
+                const uidNext = status.uidNext || 1;
+                const mailboxMaxUid = (status.messages && status.messages > 0) ? Math.max(0, uidNext - 1) : 0;
+
+                // Initial sync for newly registered or uninitialized user:
+                // Bookmark current highest UID to prevent spamming notifications for historical emails
+                if (!lastNotifiedUid || lastNotifiedUid <= 0) {
+                    return {
+                        isInitialSync: true,
+                        highestUid: mailboxMaxUid,
+                        messages: []
+                    };
+                }
+
+                // If no new messages could exist according to mailbox status
+                if (mailboxMaxUid > 0 && lastNotifiedUid >= mailboxMaxUid) {
+                    return {
+                        isInitialSync: false,
+                        highestUid: lastNotifiedUid,
+                        messages: []
+                    };
+                }
+
+                // Query messages with UID > lastNotifiedUid
+                const searchRange = `${lastNotifiedUid + 1}:*`;
+                let uids = await this.client.search({ uid: searchRange });
+
+                // Protect against IMAP RFC 3501 range wrap-around
+                uids = (uids || []).filter(uid => uid > lastNotifiedUid);
+
+                if (uids.length === 0) {
+                    return {
+                        isInitialSync: false,
+                        highestUid: lastNotifiedUid,
+                        messages: []
+                    };
+                }
+
+                uids.sort((a, b) => a - b);
+
+                const messages = [];
+                const parseAddr = (a) => {
+                    const address = (a.mailbox && a.host)
+                        ? `${a.mailbox}@${a.host}`
+                        : (a.address || a.mailbox || '');
+                    return { name: a.name || '', address };
+                };
+
+                for (const uid of uids) {
+                    // Fetch envelope and flags only (does NOT set \Seen flag on server)
+                    for await (const msg of this.client.fetch({ uid }, {
+                        uid: true,
+                        flags: true,
+                        envelope: true
+                    }, { uid: true })) {
+                        if (msg.flags.has('\\Deleted')) {
+                            continue;
+                        }
+
+                        const envelope = msg.envelope;
+                        const fromArr = envelope.from ? envelope.from.map(parseAddr) : [];
+                        const fromStr = fromArr.length > 0 
+                            ? (fromArr[0].name ? `${fromArr[0].name} <${fromArr[0].address}>` : fromArr[0].address) 
+                            : 'Unknown Sender';
+                        const fromName = (fromArr.length > 0 && fromArr[0].name) ? fromArr[0].name : '';
+
+                        messages.push({
+                            uid: msg.uid,
+                            messageId: envelope.messageId,
+                            subject: envelope.subject || '(No Subject)',
+                            from: fromStr,
+                            fromName: fromName,
+                            to: this.email,
+                            date: envelope.date,
+                            isRead: msg.flags.has('\\Seen')
+                        });
+                    }
+                }
+
+                const maxUidFound = messages.length > 0 ? Math.max(...messages.map(m => m.uid)) : mailboxMaxUid;
+
+                return {
+                    isInitialSync: false,
+                    highestUid: Math.max(lastNotifiedUid, maxUidFound),
+                    messages
+                };
+            } finally {
+                lock.release();
+            }
+        } catch (error) {
+            throw error;
+        } finally {
+            await this.disconnect();
+        }
+    }
+
     async getUnseenMessages() {
         try {
             await this.connect();
