@@ -2,17 +2,29 @@ const nodemailer = require('nodemailer');
 
 class SmtpService {
     constructor(email, password) {
+        // Fallback to the school Mailcow host if MAIL_HOST is unset or still pointing to obsolete titan placeholder
+        let host = process.env.MAIL_HOST;
+        if (!host || host === 'imap.titan.email' || host === 'smtp.titan.email') {
+            host = 'mail.smk.baktinusantara666.sch.id';
+        }
+
+        const port = parseInt(process.env.SMTP_PORT) || 587;
+        const secure = process.env.MAIL_SECURE === 'true' || port === 465;
+
         this.transporter = nodemailer.createTransport({
-            host: process.env.MAIL_HOST,
-            port: parseInt(process.env.SMTP_PORT),
-            secure: process.env.MAIL_SECURE === 'true',
+            host,
+            port,
+            secure,
             auth: {
                 user: email,
                 pass: password
             },
             tls: {
                 rejectUnauthorized: false
-            }
+            },
+            connectionTimeout: 15000,
+            greetingTimeout: 10000,
+            socketTimeout: 30000
         });
         this.email = email;
     }

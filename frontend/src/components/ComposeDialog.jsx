@@ -202,7 +202,7 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
             onSend();
         } catch (error) {
             console.error('Send failed:', error);
-            showSnackbar('Failed to send message', 'error');
+            showSnackbar(error.response?.data?.error || 'Failed to send message', 'error');
             setSending(false); // Only reset if failed, otherwise dialog closes
         }
     };

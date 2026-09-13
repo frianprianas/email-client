@@ -5,9 +5,56 @@ const SmtpService = require('../services/smtpService');
 
 const router = express.Router();
 
-// Helper to get user's mail password
+// Helper to safely get user's mail password
 const getMailPassword = (user) => {
-    return Buffer.from(user.imapPassword, 'base64').toString('utf-8');
+    if (!user || !user.imapPassword) {
+        const err = new Error('Kredensial email tidak ditemukan pada profil user. Silakan login ulang.');
+        err.authenticationFailed = true;
+        throw err;
+    }
+    try {
+        const pass = Buffer.from(user.imapPassword, 'base64').toString('utf-8');
+        if (!pass) {
+            const err = new Error('Password email kosong. Silakan login ulang.');
+            err.authenticationFailed = true;
+            throw err;
+        }
+        return pass;
+    } catch (e) {
+        if (e.authenticationFailed) throw e;
+        const err = new Error('Gagal memproses kredensial email. Silakan login ulang.');
+        err.authenticationFailed = true;
+        throw err;
+    }
+};
+
+// Helper to identify auth/credential errors
+const isAuthError = (error) => {
+    if (!error) return false;
+    if (error.authenticationFailed) return true;
+    if (error.code === 'EAUTH') return true;
+    if (error.responseCode === 535) return true;
+    const msg = (error.message || '').toLowerCase();
+    return msg.includes('authentication failed') ||
+           msg.includes('invalid credentials') ||
+           msg.includes('invalid login') ||
+           msg.includes('password email') ||
+           msg.includes('kredensial email');
+};
+
+const handleMailError = (res, error, defaultMsg, defaultStatus = 500) => {
+    console.error(`[Mail Error] ${defaultMsg}:`, error.message || error);
+    if (isAuthError(error)) {
+        return res.status(401).json({
+            error: 'Sesi akun email Anda telah kedaluwarsa atau password email telah diperbarui. Silakan login ulang.',
+            authFailed: true,
+            details: error.message
+        });
+    }
+    return res.status(defaultStatus).json({
+        error: error.message || defaultMsg,
+        code: error.code || error.responseCode || undefined
+    });
 };
 
 // List messages in a folder
@@ -22,8 +69,7 @@ router.get('/messages/:folder', authMiddleware, async (req, res) => {
 
         res.json(result);
     } catch (error) {
-        console.error('List messages error:', error);
-        res.status(500).json({ error: 'Failed to fetch messages' });
+        return handleMailError(res, error, 'Failed to fetch messages');
     }
 });
 
@@ -38,8 +84,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
 
         res.json(result);
     } catch (error) {
-        console.error('List messages error:', error);
-        res.status(500).json({ error: 'Failed to fetch messages' });
+        return handleMailError(res, error, 'Failed to fetch messages');
     }
 });
 
@@ -53,8 +98,7 @@ router.get('/message/:folder/:uid', authMiddleware, async (req, res) => {
 
         res.json(message);
     } catch (error) {
-        console.error('Get message error:', error);
-        res.status(500).json({ error: 'Failed to fetch message' });
+        return handleMailError(res, error, 'Failed to fetch message');
     }
 });
 
@@ -73,8 +117,7 @@ router.get('/search/:folder', authMiddleware, async (req, res) => {
 
         res.json(result);
     } catch (error) {
-        console.error('Search error:', error);
-        res.status(500).json({ error: 'Failed to search messages' });
+        return handleMailError(res, error, 'Failed to search messages');
     }
 });
 
@@ -92,8 +135,7 @@ router.get('/search', authMiddleware, async (req, res) => {
 
         res.json(result);
     } catch (error) {
-        console.error('Search error:', error);
-        res.status(500).json({ error: 'Failed to search messages' });
+        return handleMailError(res, error, 'Failed to search messages');
     }
 });
 
@@ -214,8 +256,7 @@ router.post('/send', authMiddleware, async (req, res) => {
 
         res.json({ message: 'Email sent successfully', messageId: info.messageId });
     } catch (error) {
-        console.error('Send email error:', error);
-        res.status(500).json({ error: 'Failed to send email' });
+        return handleMailError(res, error, 'Failed to send email');
     }
 });
 
@@ -264,8 +305,7 @@ router.post('/draft', authMiddleware, async (req, res) => {
 
         res.json({ message: 'Draft saved successfully' });
     } catch (error) {
-        console.error('Save draft error:', error);
-        res.status(500).json({ error: 'Failed to save draft' });
+        return handleMailError(res, error, 'Failed to save draft');
     }
 });
 
@@ -323,8 +363,7 @@ router.post('/draft/send', authMiddleware, async (req, res) => {
 
         res.json({ message: 'Draft sent successfully', messageId: info.messageId });
     } catch (error) {
-        console.error('Send draft error:', error);
-        res.status(500).json({ error: 'Failed to send draft' });
+        return handleMailError(res, error, 'Failed to send draft');
     }
 });
 
@@ -339,8 +378,7 @@ router.put('/message/:folder/:uid/read', authMiddleware, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Toggle read error:', error);
-        res.status(500).json({ error: 'Failed to update message' });
+        return handleMailError(res, error, 'Failed to update message');
     }
 });
 
@@ -355,8 +393,7 @@ router.put('/message/:folder/:uid/star', authMiddleware, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Toggle star error:', error);
-        res.status(500).json({ error: 'Failed to update message' });
+        return handleMailError(res, error, 'Failed to update message');
     }
 });
 
@@ -371,8 +408,7 @@ router.put('/message/:uid/move', authMiddleware, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Move message error:', error);
-        res.status(500).json({ error: 'Failed to move message' });
+        return handleMailError(res, error, 'Failed to move message');
     }
 });
 
@@ -393,8 +429,7 @@ router.delete('/message/:folder/:uid', authMiddleware, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Delete message error:', error);
-        res.status(500).json({ error: error.message || 'Failed to delete message' });
+        return handleMailError(res, error, 'Failed to delete message');
     }
 });
 
@@ -406,8 +441,7 @@ router.get('/folders', authMiddleware, async (req, res) => {
 
         res.json(mailboxes);
     } catch (error) {
-        console.error('List folders error:', error);
-        res.status(500).json({ error: 'Failed to list folders' });
+        return handleMailError(res, error, 'Failed to list folders');
     }
 });
 

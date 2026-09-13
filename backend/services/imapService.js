@@ -12,10 +12,18 @@ class ImapService {
     }
 
     async connect() {
+        let host = process.env.MAIL_HOST;
+        if (!host || host === 'imap.titan.email' || host === 'smtp.titan.email') {
+            host = 'mail.smk.baktinusantara666.sch.id';
+        }
+
+        const port = process.env.IMAP_PORT ? parseInt(process.env.IMAP_PORT) : (process.env.MAIL_SECURE === 'false' ? 143 : 993);
+        const secure = port === 993 || (process.env.MAIL_SECURE === 'true' && port !== 143);
+
         this.client = new ImapFlow({
-            host: process.env.MAIL_HOST,
-            port: process.env.IMAP_PORT ? parseInt(process.env.IMAP_PORT) : 993,
-            secure: process.env.MAIL_SECURE !== 'false',
+            host,
+            port,
+            secure,
             auth: {
                 user: this.email,
                 pass: this.password
@@ -23,7 +31,8 @@ class ImapService {
             logger: false,
             tls: {
                 rejectUnauthorized: false
-            }
+            },
+            timeout: 15000
         });
         await this.client.connect();
         return this.client;
