@@ -127,4 +127,70 @@ const updateMailboxTags = async (email, tags) => {
     }
 };
 
-module.exports = { changePassword, getMailboxTags, getAllMailboxes, updateMailboxTags };
+
+let internalContactsCache = null;
+let cacheExpiry = 0;
+const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes cache
+
+/**
+ * Fetch all internal mailboxes with tags from Mailcow with 10-minute caching
+ */
+const getInternalContactsWithTags = async () => {
+    const now = Date.now();
+    if (internalContactsCache && now < cacheExpiry) {
+        return internalContactsCache;
+    }
+
+    try {
+        const raw = await getAllMailboxes();
+        const items = Array.isArray(raw) ? raw : Object.values(raw);
+        
+        const contacts = [];
+        const tagGroups = {};
+
+        items.forEach(mb => {
+            const email = mb.username || mb.email || (mb.local_part && mb.domain ? `${mb.local_part}@${mb.domain}` : '');
+            if (!email) return;
+
+            const name = (mb.name || mb.displayName || '').trim();
+            const tags = Array.isArray(mb.tags) ? mb.tags.filter(Boolean) : (mb.tags ? [mb.tags] : []);
+
+            contacts.push({
+                id: `mailcow_${email}`,
+                name: name || email.split('@')[0],
+                email,
+                tags,
+                isInternal: true
+            });
+
+            tags.forEach(tag => {
+                const cleanTag = tag.trim();
+                if (!cleanTag) return;
+                if (!tagGroups[cleanTag]) tagGroups[cleanTag] = [];
+                tagGroups[cleanTag].push(name ? `${name} <${email}>` : email);
+            });
+        });
+
+        // Generate bulk group items for quick multi-recipient selection
+        const groups = Object.keys(tagGroups).sort().map(tag => ({
+            id: `group_${tag.toLowerCase()}`,
+            name: `[Grup] Semua ${tag}`,
+            email: `group-${tag.toLowerCase()}@internal`,
+            tags: [tag],
+            isGroup: true,
+            memberCount: tagGroups[tag].length,
+            members: tagGroups[tag]
+        }));
+
+        internalContactsCache = { contacts, groups };
+        cacheExpiry = now + CACHE_DURATION_MS;
+        return internalContactsCache;
+    } catch (err) {
+        console.error('Failed to get internal contacts with tags:', err.message);
+        if (internalContactsCache) return internalContactsCache;
+        return { contacts: [], groups: [] };
+    }
+};
+
+module.exports = { changePassword, getMailboxTags, getAllMailboxes, updateMailboxTags, getInternalContactsWithTags };
+

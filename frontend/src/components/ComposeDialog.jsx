@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import {
-    Dialog, Box, Typography, IconButton, TextField, Autocomplete,
+    Dialog, Box, Typography, IconButton, TextField, Autocomplete, Avatar,
     Button, CircularProgress, Tooltip, Divider, Chip, Slide
 } from '@mui/material';
 import {
@@ -23,7 +23,8 @@ import {
     DeleteOutline as DeleteOutlineIcon,
     Schedule as ScheduleIcon,
     ArrowDropDown as ArrowDropDownIcon,
-    CloudUpload as CloudUploadIcon
+    CloudUpload as CloudUploadIcon,
+    Group as GroupIcon
 } from '@mui/icons-material';
 
 import { Menu, MenuItem, ListItemText, ListItemIcon, Popover, ButtonGroup } from '@mui/material';
@@ -66,6 +67,127 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
     // Schedule state
     const [scheduleAnchorEl, setScheduleAnchorEl] = useState(null);
     const [customDate, setCustomDate] = useState('');
+
+    // Contact maps & options for Mailcow TAG suggestions
+    const contactsMap = React.useMemo(() => {
+        const map = new Map();
+        (allContacts || []).forEach(c => {
+            if (c.isGroup) {
+                const optStr = `${c.name} (${c.memberCount} anggota)`;
+                map.set(optStr, c);
+                map.set(c.id, c);
+            } else {
+                const optStr = c.name ? `${c.name} <${c.email}>` : c.email;
+                map.set(optStr, c);
+                map.set(c.email.toLowerCase(), c);
+                if (c.name) map.set(c.name.toLowerCase(), c);
+            }
+        });
+        return map;
+    }, [allContacts]);
+
+    const contactOptions = React.useMemo(() => {
+        return (allContacts || []).map(c => {
+            if (c.isGroup) {
+                return `${c.name} (${c.memberCount} anggota)`;
+            }
+            return c.name ? `${c.name} <${c.email}>` : c.email;
+        });
+    }, [allContacts]);
+
+    const getTagStyle = (tag) => {
+        switch ((tag || '').toLowerCase()) {
+            case 'guru': return { bg: 'rgba(46, 125, 50, 0.15)', color: '#2e7d32', border: '#81c784' };
+            case 'siswa': return { bg: 'rgba(21, 101, 192, 0.15)', color: '#1565c0', border: '#64b5f6' };
+            case 'tu': return { bg: 'rgba(230, 81, 0, 0.15)', color: '#e65100', border: '#ffb74d' };
+            case 'admin': return { bg: 'rgba(198, 40, 40, 0.15)', color: '#c62828', border: '#e57373' };
+            default: return { bg: 'rgba(123, 31, 162, 0.15)', color: '#7b1fa2', border: '#ba68c8' };
+        }
+    };
+
+    const filterContactOptions = (options, params) => {
+        const q = (params.inputValue || '').toLowerCase().trim();
+        if (!q) return options.slice(0, 30);
+
+        return options.filter(opt => {
+            const contact = contactsMap.get(opt);
+            if (!contact) return opt.toLowerCase().includes(q);
+
+            if (contact.name && contact.name.toLowerCase().includes(q)) return true;
+            if (contact.email && contact.email.toLowerCase().includes(q)) return true;
+            if (contact.tags && contact.tags.some(t => t.toLowerCase().includes(q))) return true;
+            return opt.toLowerCase().includes(q);
+        }).slice(0, 35);
+    };
+
+    const handleRecipientChange = (setter) => (event, newValue) => {
+        const expanded = [];
+        newValue.forEach(item => {
+            const contact = contactsMap.get(item);
+            if (contact && contact.isGroup && Array.isArray(contact.members)) {
+                contact.members.forEach(member => {
+                    if (!expanded.includes(member)) {
+                        expanded.push(member);
+                    }
+                });
+                showSnackbar(`${contact.members.length} penerima dari ${contact.name} ditambahkan!`, 'info');
+            } else {
+                if (!expanded.includes(item)) {
+                    expanded.push(item);
+                }
+            }
+        });
+        setter(expanded);
+    };
+
+    const renderRecipientOption = (props, option) => {
+        const contact = contactsMap.get(option);
+        const isGroup = contact?.isGroup;
+        const tags = contact?.tags || [];
+
+        return (
+            <Box component="li" {...props} key={props.id || option} sx={{ display: 'flex', alignItems: 'center', py: 0.75, px: 1.5, gap: 1.5 }}>
+                <Avatar sx={{
+                    width: 32,
+                    height: 32,
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    bgcolor: isGroup ? '#ff9800' : (tags.includes('Guru') ? '#2e7d32' : tags.includes('Siswa') ? '#1976d2' : tags.includes('Admin') ? '#d32f2f' : '#5c6bc0')
+                }}>
+                    {isGroup ? <GroupIcon sx={{ fontSize: 18 }} /> : (contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.email ? contact.email.charAt(0).toUpperCase() : '@'))}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.84rem' }}>
+                            {contact?.name || option}
+                        </Typography>
+                        {tags.map(t => {
+                            const st = getTagStyle(t);
+                            return (
+                                <Chip
+                                    key={t}
+                                    label={t}
+                                    size="small"
+                                    sx={{
+                                        height: 18,
+                                        fontSize: '0.65rem',
+                                        fontWeight: 700,
+                                        bgcolor: st.bg,
+                                        color: st.color,
+                                        border: `1px solid ${st.border}`,
+                                        '& .MuiChip-label': { px: 0.75 }
+                                    }}
+                                />
+                            );
+                        })}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.75rem', lineHeight: 1.2 }}>
+                        {isGroup ? `${contact.memberCount} akun internal Mailcow` : (contact?.email || option)}
+                    </Typography>
+                </Box>
+            </Box>
+        );
+    };
     const scheduleBtnRef = useRef(null);
 
     // Set initial content only when dialog opens or initialData changes
@@ -597,14 +719,19 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                 multiple
                                 freeSolo
                                 fullWidth
-                                options={allContacts.map((c) => c.name ? `${c.name} <${c.email}>` : c.email)}
+                                options={contactOptions}
+                                filterOptions={filterContactOptions}
+                                renderOption={renderRecipientOption}
                                 value={to}
-                                onChange={(event, newValue) => setTo(newValue)}
+                                onChange={handleRecipientChange(setTo)}
                                 inputValue={toInputValue}
                                 onInputChange={(event, newInputValue) => setToInputValue(newInputValue)}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => {
                                         const { key, ...tagProps } = getTagProps({ index });
+                                        const contact = contactsMap.get(option);
+                                        const tag = contact?.tags?.[0];
+                                        const tagSt = tag ? getTagStyle(tag) : null;
                                         return (
                                             <Chip
                                                 key={key}
@@ -612,7 +739,16 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                                 label={option}
                                                 size="small"
                                                 {...tagProps}
-                                                sx={{ borderRadius: 1, height: 24, fontSize: '0.8125rem', mr: 0.5 }}
+                                                sx={{
+                                                    borderRadius: 1,
+                                                    height: 24,
+                                                    fontSize: '0.8125rem',
+                                                    mr: 0.5,
+                                                    bgcolor: tagSt ? tagSt.bg : undefined,
+                                                    borderColor: tagSt ? tagSt.border : undefined,
+                                                    color: tagSt ? tagSt.color : undefined,
+                                                    fontWeight: tagSt ? 600 : 400
+                                                }}
                                             />
                                         );
                                     })
@@ -662,14 +798,19 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                     multiple
                                     freeSolo
                                     fullWidth
-                                    options={allContacts.map((c) => c.name ? `${c.name} <${c.email}>` : c.email)}
+                                    options={contactOptions}
+                                    filterOptions={filterContactOptions}
+                                    renderOption={renderRecipientOption}
                                     value={cc}
-                                    onChange={(event, newValue) => setCc(newValue)}
+                                    onChange={handleRecipientChange(setCc)}
                                     inputValue={ccInputValue}
                                     onInputChange={(event, newInputValue) => setCcInputValue(newInputValue)}
                                     renderTags={(value, getTagProps) =>
                                         value.map((option, index) => {
                                             const { key, ...tagProps } = getTagProps({ index });
+                                            const contact = contactsMap.get(option);
+                                            const tag = contact?.tags?.[0];
+                                            const tagSt = tag ? getTagStyle(tag) : null;
                                             return (
                                                 <Chip
                                                     key={key}
@@ -677,7 +818,16 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                                     label={option}
                                                     size="small"
                                                     {...tagProps}
-                                                    sx={{ borderRadius: 1, height: 24, fontSize: '0.8125rem', mr: 0.5 }}
+                                                    sx={{
+                                                        borderRadius: 1,
+                                                        height: 24,
+                                                        fontSize: '0.8125rem',
+                                                        mr: 0.5,
+                                                        bgcolor: tagSt ? tagSt.bg : undefined,
+                                                        borderColor: tagSt ? tagSt.border : undefined,
+                                                        color: tagSt ? tagSt.color : undefined,
+                                                        fontWeight: tagSt ? 600 : 400
+                                                    }}
                                                 />
                                             );
                                         })
@@ -701,14 +851,19 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                     multiple
                                     freeSolo
                                     fullWidth
-                                    options={allContacts.map((c) => c.name ? `${c.name} <${c.email}>` : c.email)}
+                                    options={contactOptions}
+                                    filterOptions={filterContactOptions}
+                                    renderOption={renderRecipientOption}
                                     value={bcc}
-                                    onChange={(event, newValue) => setBcc(newValue)}
+                                    onChange={handleRecipientChange(setBcc)}
                                     inputValue={bccInputValue}
                                     onInputChange={(event, newInputValue) => setBccInputValue(newInputValue)}
                                     renderTags={(value, getTagProps) =>
                                         value.map((option, index) => {
                                             const { key, ...tagProps } = getTagProps({ index });
+                                            const contact = contactsMap.get(option);
+                                            const tag = contact?.tags?.[0];
+                                            const tagSt = tag ? getTagStyle(tag) : null;
                                             return (
                                                 <Chip
                                                     key={key}
@@ -716,7 +871,16 @@ const ComposeDialog = ({ open, onClose, onSend, onSaveDraft, initialData, showSn
                                                     label={option}
                                                     size="small"
                                                     {...tagProps}
-                                                    sx={{ borderRadius: 1, height: 24, fontSize: '0.8125rem', mr: 0.5 }}
+                                                    sx={{
+                                                        borderRadius: 1,
+                                                        height: 24,
+                                                        fontSize: '0.8125rem',
+                                                        mr: 0.5,
+                                                        bgcolor: tagSt ? tagSt.bg : undefined,
+                                                        borderColor: tagSt ? tagSt.border : undefined,
+                                                        color: tagSt ? tagSt.color : undefined,
+                                                        fontWeight: tagSt ? 600 : 400
+                                                    }}
                                                 />
                                             );
                                         })
